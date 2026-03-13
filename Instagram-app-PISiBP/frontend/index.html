@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instagram Clone Frontend</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <div>
+        <h1>Instagram Clone</h1>
+      </div>
+      <button id="reloadAllBtn" class="primary-btn">Osveži sve</button>
+    </header>
+
+    <section class="grid two-cols">
+      <div class="card">
+        <h2>Podešavanja servisa</h2>
+        <div class="form-grid">
+          <label>Korisnici servis
+            <input id="userServiceUrl" type="text" value="http://localhost:5000" />
+          </label>
+          <label>Objave servis
+            <input id="postServiceUrl" type="text" value="http://localhost:5001" />
+          </label>
+          <label>Feed servis
+            <input id="feedServiceUrl" type="text" value="http://localhost:5002" />
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Brze informacije</h2>
+        <div class="stats">
+          <div class="stat-box">
+            <span>Korisnici</span>
+            <strong id="usersCount">0</strong>
+          </div>
+          <div class="stat-box">
+            <span>Objave</span>
+            <strong id="postsCount">0</strong>
+          </div>
+          <div class="stat-box">
+            <span>Feed stavke</span>
+            <strong id="feedCount">0</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid two-cols">
+      <div class="card">
+        <h2>Dodavanje korisnika</h2>
+        <form id="createUserForm" class="stack">
+          <input name="username" type="text" placeholder="Username" required />
+          <input name="full_name" type="text" placeholder="Ime i prezime" />
+          <input name="email" type="email" placeholder="Email" />
+          <button type="submit" class="primary-btn">Sačuvaj korisnika</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Praćenje korisnika</h2>
+        <form id="followForm" class="stack">
+          <input name="follower_id" type="number" placeholder="ID pratioca" required />
+          <input name="followed_id" type="number" placeholder="ID korisnika koji se prati" required />
+          <button type="submit" class="primary-btn">Zaprati</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="grid two-cols">
+      <div class="card">
+        <h2>Nova objava</h2>
+        <form id="createPostForm" class="stack" enctype="multipart/form-data">
+          <input name="user_id" type="number" placeholder="ID korisnika" required />
+          <textarea name="content" rows="5" placeholder="Tekst objave" required></textarea>
+          <input name="image" type="file" accept="image/*" />
+          <button type="submit" class="primary-btn">Objavi</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Učitavanje feed-a</h2>
+        <form id="feedForm" class="stack">
+          <input name="user_id" type="number" placeholder="Unesi ID korisnika" required />
+          <button type="submit" class="primary-btn">Prikaži feed</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="grid two-cols data-sections">
+      <div class="card">
+        <div class="section-header">
+          <h2>Korisnici</h2>
+          <button id="loadUsersBtn">Učitaj korisnike</button>
+        </div>
+        <div id="usersList" class="list"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>Objave</h2>
+          <button id="loadPostsBtn">Učitaj objave</button>
+        </div>
+        <div id="postsList" class="list"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-header">
+        <h2>Feed</h2>
+        <button id="clearFeedBtn">Obriši prikaz</button>
+      </div>
+      <div id="feedList" class="list"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-header">
+        <h2>Odgovor servera</h2>
+        <button id="clearLogBtn">Očisti</button>
+      </div>
+      <pre id="serverLog" class="server-log">Spremno.</pre>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
