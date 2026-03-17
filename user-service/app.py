@@ -53,3 +53,42 @@ if __name__ == '__main__':
         db.create_all()
     app.run(debug=True)
 
+# DEKORATOR ZA TOKEN
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('x-access-token')
+        if not token:
+            return jsonify({'message':'Token missing!'}), 401
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            current_user = User.query.get(data['id'])
+        except:
+            return jsonify({'message':'Token invalid!'}), 401
+        return f(current_user, *args, **kwargs)
+    return decorated
+
+# REGISTRACIJA
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    if User.query.filter_by(username=data['username']).first():
+        return jsonify({'message':'Username exists'}), 400
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({'message':'Email exists'}), 400
+    user = User(username=data['username'], email=data['email'], name=data['name'])
+    user.set_password(data['password'])
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({'message':'User created'}), 201
+
+# PRIJAVA
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    user = User.query.filter((User.username==data['login']) | (User.email==data['login'])).first()
+    if not user or not user.check_password(data['password']):
+        return jsonify({'message':'Invalid credentials'}), 401
+    token = jwt.encode({'id': user.id, 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=2)},
+                       app.config['SECRET_KEY'], algorithm='HS256')
+    return jsonify({'token': token}) 
