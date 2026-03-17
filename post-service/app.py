@@ -2,24 +2,28 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from functools import wraps
-import os, jwt, requests
+import os, jwt, uuid
 from datetime import datetime
+from flask_cors import CORS
+
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'tajni_kljuc'  # isti ključ kao u User servisu
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+CORS(app)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_fallback_key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///posts.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB po fajlu
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
 
 db = SQLAlchemy(app)
+
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-# MODELI
+# ───────────────────────────── MODELS ─────────────────────────────
+
 post_files = db.Table('post_files',
-    db.Column('post_id', db.Integer, db.ForeignKey('post.id')),
-    db.Column('file_id', db.Integer, db.ForeignKey('file.id'))
+    db.Column('post_id', db.Integer, db.ForeignKey('post.id'), primary_key=True),
+    db.Column('file_id', db.Integer, db.ForeignKey('file.id'), primary_key=True)
 )
 
 class Post(db.Model):
@@ -27,35 +31,39 @@ class Post(db.Model):
     author_id = db.Column(db.Integer, nullable=False)
     description = db.Column(db.String(500))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    files = db.relationship('File', secondary=post_files, backref='posts')
-    likes = db.relationship('Like', backref='post', lazy=True)
-    comments = db.relationship('Comment', backref='post', lazy=True)
+    files = db.relationship('File', secondary=post_files, backref='posts', cascade='all')
+    likes = db.relationship('Like', backref='post', lazy=True, cascade='all, delete-orphan')
+    comments = db.relationship('Comment', backref='post', lazy=True, cascade='all, delete-orphan')
 
 class File(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(200), nullable=False)
+    filename = db.Column(db.String(300), nullable=False)
     mimetype = db.Column(db.String(50))
 
 class Like(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('user_id', 'post_id'),)
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
-    text = db.Column(db.String(500))
+    text = db.Column(db.String(500), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 with app.app_context():
     db.create_all()
 
-# POMOĆNE FUNKCIJE
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ['jpg','jpeg','png','gif','mp4','mov','avi']
+# ───────────────────────────── HELPERS ─────────────────────────────
 
-# DEKORATOR ZA TOKEN I VALIDACIJU KORISNIKA
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'webp'}
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -65,11 +73,113 @@ def token_required(f):
             if len(parts) == 2 and parts[0].lower() == 'bearer':
                 token = parts[1]
         if not token:
-            return jsonify({'message':'Token missing'}), 401
+            return jsonify({'message': 'Token missing'}), 401
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
             user_id = data['id']
         except Exception as e:
-            return jsonify({'message':'Token invalid', 'error': str(e)}), 401
+            return jsonify({'message': 'Token invalid', 'error': str(e)}), 401
         return f(user_id, *args, **kwargs)
     return decorated
+
+def serialize_post(post, full_comments=False):
+    result = {
+        'id': post.id,
+        'author_id': post.author_id,
+        'description': post.description,
+        'timestamp': post.timestamp.isoformat(),
+        'files': [{'id': f.id, 'filename': f.filename, 'mimetype': f.mimetype} for f in post.files],
+        'likes_count': len(post.likes),
+        'comments_count': len(post.comments),
+    }
+    if full_comments:
+        result['comments'] = [
+            {'id': c.id, 'user_id': c.user_id, 'text': c.text, 'timestamp': c.timestamp.isoformat()}
+            for c in post.comments
+        ]
+    return result
+
+# ───────────────────────────── POSTS CRUD ─────────────────────────────
+
+@app.route('/posts', methods=['POST'])
+@token_required
+def create_post(user_id):
+    description = request.form.get('description', '')
+    files = request.files.getlist('files')
+
+    if not files or all(f.filename == '' for f in files):
+        return jsonify({'message': 'At least one file is required'}), 400
+    if len(files) > 20:
+        return jsonify({'message': 'Max 20 files per post'}), 400
+
+    post = Post(author_id=user_id, description=description)
+
+    for f in files:
+        if not f or not allowed_file(f.filename):
+            return jsonify({'message': f'Invalid file type: {f.filename}'}), 400
+
+        f.seek(0, 2)
+        size = f.tell()
+        f.seek(0)
+        if size > MAX_FILE_SIZE:
+            return jsonify({'message': f'File {f.filename} exceeds 50MB limit'}), 400
+
+        filename = f"{uuid.uuid4().hex}_{secure_filename(f.filename)}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        f.save(filepath)
+        file_entry = File(filename=filename, mimetype=f.mimetype)
+        db.session.add(file_entry)
+        post.files.append(file_entry)
+
+    db.session.add(post)
+    db.session.commit()
+    return jsonify({'message': 'Post created', 'post_id': post.id}), 201
+
+@app.route('/posts/<int:post_id>', methods=['GET'])
+@token_required
+def get_post(user_id, post_id):
+    post = Post.query.get(post_id)
+    if not post:
+        return jsonify({'message': 'Post not found'}), 404
+    return jsonify(serialize_post(post, full_comments=True))
+
+@app.route('/posts/<int:post_id>', methods=['PUT'])
+@token_required
+def update_post(user_id, post_id):
+    post = Post.query.get(post_id)
+    if not post:
+        return jsonify({'message': 'Post not found'}), 404
+    if post.author_id != user_id:
+        return jsonify({'message': 'Not allowed'}), 403
+
+    data = request.json or {}
+    description = data.get('description')
+    if description is None:
+        return jsonify({'message': 'No description provided'}), 400
+    post.description = description
+    db.session.commit()
+    return jsonify({'message': 'Description updated'})
+
+@app.route('/posts/<int:post_id>', methods=['DELETE'])
+@token_required
+def delete_post(user_id, post_id):
+    post = Post.query.get(post_id)
+    if not post:
+        return jsonify({'message': 'Post not found'}), 404
+    if post.author_id != user_id:
+        return jsonify({'message': 'Not allowed'}), 403
+    for f in post.files:
+        try:
+            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], f.filename))
+        except OSError:
+            pass
+    db.session.delete(post)
+    db.session.commit()
+    return jsonify({'message': 'Post deleted'})
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001)
