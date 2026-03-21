@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from functools import wraps
-import os, jwt, uuid
+import os, jwt, uuid, requests
 from datetime import datetime
 from flask_cors import CORS
 
@@ -15,6 +15,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
 
 db = SQLAlchemy(app)
+
+USER_SERVICE_URL = os.environ.get('USER_SERVICE_URL', 'http://user-service:5000')
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
@@ -82,20 +84,59 @@ def token_required(f):
         return f(user_id, *args, **kwargs)
     return decorated
 
-def serialize_post(post, full_comments=False):
+def get_token():
+    parts = request.headers.get('Authorization', '').split()
+    return parts[1] if len(parts) == 2 else None
+
+def get_blocked_ids(user_id, token):
+    try:
+        resp = requests.get(
+            f'{USER_SERVICE_URL}/blocked-ids',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=5
+        )
+        if resp.status_code == 200:
+            return set(resp.json().get('blocked_ids', []))
+    except Exception:
+        pass
+    return set()
+
+def can_view_posts_of(viewer_id, author_id, token):
+    if viewer_id == author_id:
+        return True
+    try:
+        resp = requests.get(
+            f'{USER_SERVICE_URL}/profile/{author_id}',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=5
+        )
+        if resp.status_code == 404:
+            return False
+        if resp.status_code == 200:
+            data = resp.json()
+            is_private = data.get('is_private', False)
+            is_following = data.get('is_following', False)
+            return (not is_private) or is_following
+    except Exception:
+        pass
+    return False
+
+def serialize_post(post, blocked_ids, full_comments=False):
+    visible_likes = [l for l in post.likes if l.user_id not in blocked_ids]
+    visible_comments = [c for c in post.comments if c.user_id not in blocked_ids]
     result = {
         'id': post.id,
         'author_id': post.author_id,
         'description': post.description,
         'timestamp': post.timestamp.isoformat(),
         'files': [{'id': f.id, 'filename': f.filename, 'mimetype': f.mimetype} for f in post.files],
-        'likes_count': len(post.likes),
-        'comments_count': len(post.comments),
+        'likes_count': len(visible_likes),
+        'comments_count': len(visible_comments),
     }
     if full_comments:
         result['comments'] = [
             {'id': c.id, 'user_id': c.user_id, 'text': c.text, 'timestamp': c.timestamp.isoformat()}
-            for c in post.comments
+            for c in visible_comments
         ]
     return result
 
@@ -138,10 +179,16 @@ def create_post(user_id):
 @app.route('/posts/<int:post_id>', methods=['GET'])
 @token_required
 def get_post(user_id, post_id):
+    token = get_token()
     post = Post.query.get(post_id)
     if not post:
         return jsonify({'message': 'Post not found'}), 404
-    return jsonify(serialize_post(post, full_comments=True))
+
+    if not can_view_posts_of(user_id, post.author_id, token):
+        return jsonify({'message': 'Cannot view this post'}), 403
+
+    blocked_ids = get_blocked_ids(user_id, token)
+    return jsonify(serialize_post(post, blocked_ids, full_comments=True))
 
 @app.route('/posts/<int:post_id>', methods=['PUT'])
 @token_required
