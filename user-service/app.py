@@ -208,5 +208,112 @@ def update_profile(current_user):
     db.session.commit()
     return jsonify({'message': 'Profile updated'})
 
+# ───────────────────────────── FOLLOW ─────────────────────────────
+
+@app.route('/follow/<int:user_id>', methods=['POST'])
+@token_required
+def follow(current_user, user_id):
+    if current_user.id == user_id:
+        return jsonify({'message': 'Cannot follow yourself'}), 400
+
+    target = User.query.get(user_id)
+    if not target:
+        return jsonify({'message': 'User not found'}), 404
+
+    if is_blocked(current_user, target):
+        return jsonify({'message': 'User not found'}), 404
+
+    if current_user in target.followers:
+        return jsonify({'message': 'Already following'}), 400
+
+    if target.is_private:
+        # Check if request already exists
+        existing = FollowRequest.query.filter_by(
+            sender_id=current_user.id, receiver_id=target.id, status='pending'
+        ).first()
+        if existing:
+            return jsonify({'message': 'Follow request already sent'}), 400
+        req = FollowRequest(sender_id=current_user.id, receiver_id=target.id)
+        db.session.add(req)
+        db.session.commit()
+        return jsonify({'message': 'Follow request sent'}), 200
+    else:
+        target.followers.append(current_user)
+        db.session.commit()
+        return jsonify({'message': 'Now following'}), 200
+
+@app.route('/unfollow/<int:user_id>', methods=['POST'])
+@token_required
+def unfollow(current_user, user_id):
+    target = User.query.get(user_id)
+    if not target:
+        return jsonify({'message': 'User not found'}), 404
+    if current_user not in target.followers:
+        return jsonify({'message': 'Not following this user'}), 400
+    target.followers.remove(current_user)
+    db.session.commit()
+    return jsonify({'message': 'Unfollowed'})
+
+@app.route('/remove-follower/<int:user_id>', methods=['POST'])
+@token_required
+def remove_follower(current_user, user_id):
+    """Remove someone from your followers list."""
+    follower = User.query.get(user_id)
+    if not follower:
+        return jsonify({'message': 'User not found'}), 404
+    if follower not in current_user.followers:
+        return jsonify({'message': 'This user is not following you'}), 400
+    current_user.followers.remove(follower)
+    db.session.commit()
+    return jsonify({'message': 'Follower removed'})
+
+@app.route('/following/<int:user_id>', methods=['GET'])
+@token_required
+def get_following(current_user, user_id):
+    """Returns list of user IDs that user_id is following. Used by feed-service."""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    return jsonify({'following': [u.id for u in user.following]})
+
+# ───────────────────────────── FOLLOW REQUESTS ─────────────────────────────
+
+@app.route('/follow-requests', methods=['GET'])
+@token_required
+def get_follow_requests(current_user):
+    """Incoming pending follow requests for current user."""
+    reqs = FollowRequest.query.filter_by(receiver_id=current_user.id, status='pending').all()
+    return jsonify({'requests': [
+        {'id': r.id, 'sender_id': r.sender_id, 'timestamp': r.timestamp.isoformat()}
+        for r in reqs
+    ]})
+
+@app.route('/follow-requests/<int:req_id>/accept', methods=['POST'])
+@token_required
+def accept_follow_request(current_user, req_id):
+    req = FollowRequest.query.get(req_id)
+    if not req or req.receiver_id != current_user.id:
+        return jsonify({'message': 'Request not found'}), 404
+    if req.status != 'pending':
+        return jsonify({'message': 'Request already handled'}), 400
+    req.status = 'accepted'
+    sender = User.query.get(req.sender_id)
+    if sender:
+        current_user.followers.append(sender)
+    db.session.commit()
+    return jsonify({'message': 'Follow request accepted'})
+
+@app.route('/follow-requests/<int:req_id>/reject', methods=['POST'])
+@token_required
+def reject_follow_request(current_user, req_id):
+    req = FollowRequest.query.get(req_id)
+    if not req or req.receiver_id != current_user.id:
+        return jsonify({'message': 'Request not found'}), 404
+    if req.status != 'pending':
+        return jsonify({'message': 'Request already handled'}), 400
+    req.status = 'rejected'
+    db.session.commit()
+    return jsonify({'message': 'Follow request rejected'})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
