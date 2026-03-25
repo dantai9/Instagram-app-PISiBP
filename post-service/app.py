@@ -89,6 +89,7 @@ def get_token():
     return parts[1] if len(parts) == 2 else None
 
 def get_blocked_ids(user_id, token):
+    """Fetch list of user IDs blocked by or blocking the current user."""
     try:
         resp = requests.get(
             f'{USER_SERVICE_URL}/blocked-ids',
@@ -102,6 +103,11 @@ def get_blocked_ids(user_id, token):
     return set()
 
 def can_view_posts_of(viewer_id, author_id, token):
+    """
+    Returns True if viewer_id is allowed to see author_id's posts.
+    Calls user-service /profile endpoint which returns full data
+    for public profiles or profiles the viewer follows.
+    """
     if viewer_id == author_id:
         return True
     try:
@@ -111,9 +117,12 @@ def can_view_posts_of(viewer_id, author_id, token):
             timeout=5
         )
         if resp.status_code == 404:
+            # Blocked or not found
             return False
         if resp.status_code == 200:
             data = resp.json()
+            # Profile returned full data → viewer can see posts
+            # (user-service only returns followers list if viewer is allowed)
             is_private = data.get('is_private', False)
             is_following = data.get('is_following', False)
             return (not is_private) or is_following
@@ -159,6 +168,7 @@ def create_post(user_id):
         if not f or not allowed_file(f.filename):
             return jsonify({'message': f'Invalid file type: {f.filename}'}), 400
 
+        # Check individual file size
         f.seek(0, 2)
         size = f.tell()
         f.seek(0)
@@ -223,6 +233,118 @@ def delete_post(user_id, post_id):
     db.session.delete(post)
     db.session.commit()
     return jsonify({'message': 'Post deleted'})
+
+@app.route('/posts/<int:post_id>/files/<int:file_id>', methods=['DELETE'])
+@token_required
+def delete_file(user_id, post_id, file_id):
+    post = Post.query.get(post_id)
+    if not post:
+        return jsonify({'message': 'Post not found'}), 404
+    if post.author_id != user_id:
+        return jsonify({'message': 'Not allowed'}), 403
+    file = File.query.get(file_id)
+    if not file or file not in post.files:
+        return jsonify({'message': 'File not found in post'}), 404
+    try:
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
+    except OSError:
+        pass
+    post.files.remove(file)
+    db.session.delete(file)
+    db.session.commit()
+    return jsonify({'message': 'File removed'})
+
+# ───────────────────────────── LIKES ─────────────────────────────
+
+@app.route('/posts/<int:post_id>/like', methods=['POST'])
+@token_required
+def like_post(user_id, post_id):
+    token = get_token()
+    post = Post.query.get(post_id)
+    if not post:
+        return jsonify({'message': 'Post not found'}), 404
+
+    if not can_view_posts_of(user_id, post.author_id, token):
+        return jsonify({'message': 'Cannot like this post'}), 403
+
+    like = Like.query.filter_by(user_id=user_id, post_id=post_id).first()
+    if like:
+        db.session.delete(like)
+        db.session.commit()
+        return jsonify({'message': 'Like removed'})
+
+    new_like = Like(user_id=user_id, post_id=post_id)
+    db.session.add(new_like)
+    db.session.commit()
+    return jsonify({'message': 'Post liked'})
+
+# ───────────────────────────── COMMENTS ─────────────────────────────
+
+@app.route('/posts/<int:post_id>/comment', methods=['POST'])
+@token_required
+def add_comment(user_id, post_id):
+    token = get_token()
+    post = Post.query.get(post_id)
+    if not post:
+        return jsonify({'message': 'Post not found'}), 404
+
+    if not can_view_posts_of(user_id, post.author_id, token):
+        return jsonify({'message': 'Cannot comment on this post'}), 403
+
+    data = request.json or {}
+    text = data.get('text', '').strip()
+    if not text:
+        return jsonify({'message': 'Comment text is required'}), 400
+
+    comment = Comment(user_id=user_id, post_id=post_id, text=text)
+    db.session.add(comment)
+    db.session.commit()
+    return jsonify({'message': 'Comment added', 'comment_id': comment.id}), 201
+
+@app.route('/comments/<int:comment_id>', methods=['PUT'])
+@token_required
+def edit_comment(user_id, comment_id):
+    comment = Comment.query.get(comment_id)
+    if not comment:
+        return jsonify({'message': 'Comment not found'}), 404
+    if comment.user_id != user_id:
+        return jsonify({'message': 'Not allowed'}), 403
+
+    data = request.json or {}
+    text = data.get('text', '').strip()
+    if not text:
+        return jsonify({'message': 'Comment text is required'}), 400
+    comment.text = text
+    db.session.commit()
+    return jsonify({'message': 'Comment updated'})
+
+@app.route('/comments/<int:comment_id>', methods=['DELETE'])
+@token_required
+def delete_comment(user_id, comment_id):
+    comment = Comment.query.get(comment_id)
+    if not comment:
+        return jsonify({'message': 'Comment not found'}), 404
+    if comment.user_id != user_id:
+        return jsonify({'message': 'Not allowed'}), 403
+    db.session.delete(comment)
+    db.session.commit()
+    return jsonify({'message': 'Comment deleted'})
+
+# ───────────────────────────── USER POSTS (used by feed-service) ─────────────────────────────
+
+@app.route('/user_posts/<int:author_id>', methods=['GET'])
+@token_required
+def user_posts(user_id, author_id):
+    token = get_token()
+
+    if not can_view_posts_of(user_id, author_id, token):
+        return jsonify({'posts': []})
+
+    blocked_ids = get_blocked_ids(user_id, token)
+    posts = Post.query.filter_by(author_id=author_id).order_by(Post.timestamp.desc()).all()
+    return jsonify({'posts': [serialize_post(p, blocked_ids) for p in posts]})
+
+# ───────────────────────────── STATIC FILES ─────────────────────────────
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
