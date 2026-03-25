@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gramo — Feed</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<style>
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+  .feed-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-style: italic;
+    color: var(--accent);
+  }
+  /* POST CARD */
+  .post-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    animation: fadeUp 0.3s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .post-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.85rem 1rem;
+  }
+  .post-author {
+    font-weight: 500; font-size: 0.9rem;
+    text-decoration: none; color: var(--text);
+  }
+  .post-author:hover { color: var(--accent); }
+  .post-time { font-size: 0.75rem; color: var(--muted); }
+
+  /* CAROUSEL */
+  .carousel { position: relative; background: #000; }
+  .carousel-track { display: flex; overflow: hidden; }
+  .carousel-slide {
+    min-width: 100%; max-height: 520px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .carousel-slide img,
+  .carousel-slide video {
+    width: 100%; max-height: 520px; object-fit: contain;
+  }
+  .carousel-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(0,0,0,0.5); border: none;
+    color: #fff; font-size: 1.2rem;
+    width: 36px; height: 36px; border-radius: 50%;
+    cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .carousel-btn:hover { background: rgba(0,0,0,0.8); }
+  .carousel-btn.prev { left: 10px; }
+  .carousel-btn.next { right: 10px; }
+  .carousel-dots {
+    display: flex; justify-content: center; gap: 5px;
+    padding: 6px 0 2px;
+  }
+  .carousel-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border); transition: background 0.2s;
+  }
+  .carousel-dot.active { background: var(--accent); }
+
+  /* POST BODY */
+  .post-actions {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.75rem 1rem 0.5rem;
+  }
+  .action-btn {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem;
+    transition: color 0.15s; padding: 0;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .action-btn:hover { color: var(--accent); }
+  .action-btn.liked { color: var(--accent); }
+  .action-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .action-btn.liked svg { fill: var(--accent); }
+
+  .post-description {
+    padding: 0 1rem 0.5rem;
+    font-size: 0.875rem; line-height: 1.5;
+  }
+  .post-description strong { font-weight: 500; }
+
+  /* COMMENTS SECTION */
+  .comments-section { padding: 0 1rem 1rem; }
+  .comment-item {
+    display: flex; gap: 0.6rem; margin-bottom: 0.6rem;
+    font-size: 0.85rem; line-height: 1.4;
+  }
+  .comment-text { color: var(--text); }
+  .comment-author {
+    font-weight: 500; color: var(--accent);
+    text-decoration: none; margin-right: 0.4rem;
+  }
+  .comment-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .comment-actions-inline {
+    display: flex; gap: 0.5rem;
+    font-size: 0.72rem; color: var(--muted);
+  }
+  .comment-actions-inline button {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.72rem; font-family: 'DM Sans', sans-serif;
+    padding: 0;
+  }
+  .comment-actions-inline button:hover { color: var(--accent); }
+
+  .add-comment {
+    display: flex; gap: 0.5rem; margin-top: 0.75rem;
+    border-top: 1px solid var(--border); padding-top: 0.75rem;
+  }
+  .add-comment input {
+    flex: 1; background: var(--surface2); border: none;
+    border-radius: 20px; padding: 0.45rem 0.9rem;
+    color: var(--text); font-size: 0.85rem;
+    outline: none;
+  }
+  .add-comment input:focus { outline: 1px solid var(--accent); }
+  .add-comment button {
+    background: none; border: none; color: var(--accent);
+    font-size: 0.8rem; font-weight: 500; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+  }
+
+  /* REFRESH */
+  .refresh-bar {
+    display: flex; justify-content: flex-end;
+    margin-bottom: 1rem;
+  }
+
+  /* NEW POST BTN */
+  .fab {
+    position: fixed; bottom: 2rem; right: 2rem;
+    background: var(--accent); color: #1a1410;
+    border: none; border-radius: 50%;
+    width: 52px; height: 52px;
+    font-size: 1.6rem; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(200,169,126,0.3);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s, background 0.2s;
+    z-index: 50;
+  }
+  .fab:hover { transform: scale(1.08); background: var(--accent2); }
+
+  /* EMPTY STATE */
+  .empty {
+    text-align: center; padding: 4rem 2rem;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+  .empty h3 { font-family: 'Playfair Display', serif; font-style: italic; margin-bottom: 0.5rem; color: var(--text); }
+
+  /* LOAD MORE */
+  .load-more-wrap { text-align: center; margin: 1rem 0 3rem; }
+
+  /* NEW POST MODAL */
+  .file-drop {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .file-drop:hover, .file-drop.dragover { border-color: var(--accent); color: var(--text); }
+  .file-previews {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem;
+  }
+  .file-preview-item {
+    position: relative; width: 80px; height: 80px;
+    border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .file-preview-item img, .file-preview-item video {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .file-preview-remove {
+    position: absolute; top: 2px; right: 2px;
+    background: rgba(0,0,0,0.7); border: none;
+    color: #fff; border-radius: 50%; width: 18px; height: 18px;
+    font-size: 0.7rem; cursor: pointer; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-wordmark" href="feed.html">Gramo</a>
+  <div style="position:relative;">
+    <input class="nav-search" id="navSearch" type="text" placeholder="Search people…"/>
+    <div id="searchResults"></div>
+  </div>
+  <div class="nav-actions">
+    <a class="nav-btn" href="follow-requests.html" id="reqsLink">Requests</a>
+    <a class="nav-btn" id="myProfileLink" href="#">Profile</a>
+    <button class="nav-btn" onclick="logout()">Sign out</button>
+  </div>
+</nav>
+
+<!-- NEW POST MODAL -->
+<div class="modal-overlay" id="newPostModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeNewPost()">✕</button>
+    <div class="modal-title">New Post</div>
+    <div id="npAlert" class="alert error"></div>
+    <div>
+      <label class="field-label">Photos / Videos (max 20, 50 MB each)</label>
+      <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+        Click or drag files here
+      </div>
+      <input type="file" id="fileInput" multiple accept="image/*,video/*" style="display:none" onchange="handleFiles(this.files)"/>
+      <div class="file-previews" id="filePreviews"></div>
+    </div>
+    <div style="margin-top:1rem">
+      <label class="field-label">Description</label>
+      <textarea id="npDesc" rows="3" placeholder="Write a caption…"></textarea>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:0.75rem;justify-content:flex-end">
+      <button class="btn ghost" onclick="closeNewPost()">Cancel</button>
+      <button class="btn" onclick="submitNewPost()">Post</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="container">
+  <div class="feed-header">
+    <div class="feed-title">Your Feed</div>
+    <button class="btn ghost sm" onclick="loadFeed(true)">↻ Refresh</button>
+  </div>
+  <div id="feedContent"><div class="spinner"></div></div>
+  <div class="load-more-wrap" id="loadMoreWrap" style="display:none">
+    <button class="btn ghost" onclick="loadMore()">Load more</button>
+  </div>
+</div>
+
+<button class="fab" onclick="openNewPost()" title="New post">+</button>
+
+<script src="api.js"></script>
+<script>
+  requireAuth();
+  initNavSearch();
+
+  document.getElementById('myProfileLink').href = `profile.html?id=${getCurrentUserId()}`;
+
+  let currentPage = 1;
+  let hasNext = false;
+  const allPosts = [];
+  // user cache: id -> {name, username, profile_picture}
+  const userCache = {};
+
+  async function fetchUser(id) {
+    if (userCache[id]) return userCache[id];
+    try {
+      const r = await getProfile(id);
+      if (r && r.ok) { userCache[id] = r.data; return r.data; }
+    } catch {}
+    return { name: 'User', username: 'user', profile_picture: null };
+  }
+
+  async function loadFeed(refresh = false) {
+    if (refresh) { currentPage = 1; allPosts.length = 0; }
+    document.getElementById('feedContent').innerHTML = '<div class="spinner"></div>';
+    document.getElementById('loadMoreWrap').style.display = 'none';
+    const r = await getFeed(1);
+    if (!r) return;
+    if (!r.ok) { document.getElementById('feedContent').innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><p>${r.data.message}</p></div>`; return; }
+    allPosts.push(...r.data.feed);
+    hasNext = r.data.has_next;
+    currentPage = 1;
+    await renderFeed();
+  }
+
+  async function loadMore() {
+    currentPage++;
+    const r = await getFeed(currentPage);
+    if (!r || !r.ok) return;
+    allPosts.push(...r.data.feed);
+    hasNext = r.data.has_next;
+    await renderFeed(true);
+  }
+
+  async function renderFeed(append = false) {
+    const container = document.getElementById('feedContent');
+    if (!append) container.innerHTML = '';
+    if (allPosts.length === 0) {
+      container.innerHTML = `<div class="empty">
+        <div class="empty-icon">📷</div>
+        <h3>Nothing here yet</h3>
+        <p>Follow some people to see their posts.</p>
+      </div>`;
+      return;
+    }
+    const startIdx = append ? allPosts.length - (allPosts.length - container.children.length) : 0;
+    const postsToRender = append ? allPosts.slice(container.children.length) : allPosts;
+    for (const post of postsToRender) {
+      const user = await fetchUser(post.author_id);
+      container.appendChild(buildPostCard(post, user));
+    }
+    document.getElementById('loadMoreWrap').style.display = hasNext ? 'block' : 'none';
+  }
+
+  function buildPostCard(post, user) {
+    const div = document.createElement('div');
+    div.className = 'post-card';
+    div.id = `post-${post.id}`;
+
+    const myId = getCurrentUserId();
+    const isOwn = post.author_id === myId;
+
+    div.innerHTML = `
+      <div class="post-header">
+        <a href="profile.html?id=${post.author_id}">${avatarHTML(user, 36)}</a>
+        <div style="flex:1">
+          <a class="post-author" href="profile.html?id=${post.author_id}">${user.name}</a>
+          <div class="post-time">${timeAgo(post.timestamp)}</div>
+        </div>
+        ${isOwn ? `<button class="btn ghost sm" onclick="openEditPost(${post.id}, \`${(post.description||'').replace(/`/g,'\\`')}\`)">Edit</button>
+                   <button class="btn danger sm" onclick="doDeletePost(${post.id})">Delete</button>` : ''}
+      </div>
+      ${buildCarousel(post)}
+      <div class="post-actions">
+        <button class="action-btn ${post.liked_by_me ? 'liked' : ''}" id="like-btn-${post.id}" onclick="toggleLike(${post.id})">
+          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span id="like-count-${post.id}">${post.likes_count}</span>
+        </button>
+        <button class="action-btn" onclick="toggleComments(${post.id})">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>${post.comments_count}</span>
+        </button>
+      </div>
+      ${post.description ? `<div class="post-description"><strong>${user.name}</strong> ${escHtml(post.description)}</div>` : ''}
+      <div class="comments-section" id="comments-${post.id}" style="display:none"></div>
+    `;
+    return div;
+  }
+
+  function buildCarousel(post) {
+    if (!post.files || post.files.length === 0) return '';
+    if (post.files.length === 1) {
+      const f = post.files[0];
+      return `<div class="carousel"><div class="carousel-track"><div class="carousel-slide">
+        ${f.mimetype && f.mimetype.startsWith('video')
+          ? `<video controls src="${API_POST}/uploads/${f.filename}"></video>`
+          : `<img src="${API_POST}/uploads/${f.filename}" alt=""/>`}
+      </div></div></div>`;
+    }
+    const slides = post.files.map((f, i) => `
+      <div class="carousel-slide" data-idx="${i}">
+        ${f.mimetype && f.mimetype.startsWith('video')
+          ? `<video controls src="${API_POST}/uploads/${f.filename}"></video>`
+          : `<img src="${API_POST}/uploads/${f.filename}" alt=""/>`}
+      </div>`).join('');
+    const dots = post.files.map((_, i) => `<div class="carousel-dot ${i===0?'active':''}" data-dot-pid="${post.id}" data-dot-idx="${i}"></div>`).join('');
+    return `<div class="carousel" id="carousel-${post.id}">
+      <div class="carousel-track" id="track-${post.id}" style="transform:translateX(0);transition:transform 0.3s ease">${slides}</div>
+      <button class="carousel-btn prev" onclick="carouselMove(${post.id},-1)">‹</button>
+      <button class="carousel-btn next" onclick="carouselMove(${post.id},1)">›</button>
+      <div class="carousel-dots">${dots}</div>
+    </div>`;
+  }
+
+  const carouselIdx = {};
+  function carouselMove(pid, dir) {
+    const track = document.getElementById(`track-${pid}`);
+    if (!track) return;
+    const count = track.children.length;
+    if (!carouselIdx[pid]) carouselIdx[pid] = 0;
+    carouselIdx[pid] = (carouselIdx[pid] + dir + count) % count;
+    track.style.transform = `translateX(-${carouselIdx[pid] * 100}%)`;
+    document.querySelectorAll(`[data-dot-pid="${pid}"]`).forEach((d, i) => d.classList.toggle('active', i === carouselIdx[pid]));
+  }
+
+  async function toggleLike(postId) {
+    const r = await likePost(postId);
+    if (!r || !r.ok) return;
+    const btn = document.getElementById(`like-btn-${postId}`);
+    const count = document.getElementById(`like-count-${postId}`);
+    const isLiked = btn.classList.toggle('liked');
+    count.textContent = parseInt(count.textContent) + (isLiked ? 1 : -1);
+  }
+
+  async function toggleComments(postId) {
+    const section = document.getElementById(`comments-${postId}`);
+    if (section.style.display === 'none') {
+      section.style.display = 'block';
+      await loadComments(postId);
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
+  async function loadComments(postId) {
+    const section = document.getElementById(`comments-${postId}`);
+    const r = await getPost(postId);
+    if (!r || !r.ok) return;
+    const comments = r.data.comments || [];
+    const myId = getCurrentUserId();
+    section.innerHTML = comments.length === 0
+      ? `<div style="color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem">No comments yet.</div>`
+      : comments.map(c => `
+          <div class="comment-item" id="comment-${c.id}">
+            <div style="flex:1">
+              <span class="comment-author">${c.user_id}</span>
+              <span class="comment-text" id="ctext-${c.id}">${escHtml(c.text)}</span>
+              <div class="comment-meta">
+                ${timeAgo(c.timestamp)}
+                ${c.user_id === myId ? `
+                  <span class="comment-actions-inline">
+                    · <button onclick="startEditComment(${c.id}, \`${c.text.replace(/`/g,'\\`')}\`)">Edit</button>
+                    · <button onclick="doDeleteComment(${c.id}, ${postId})">Delete</button>
+                  </span>` : ''}
+              </div>
+            </div>
+          </div>`).join('');
+    section.innerHTML += `
+      <div class="add-comment">
+        <input type="text" id="ci-${postId}" placeholder="Add a comment…" onkeydown="if(event.key==='Enter') submitComment(${postId})"/>
+        <button onclick="submitComment(${postId})">Post</button>
+      </div>`;
+  }
+
+  async function submitComment(postId) {
+    const input = document.getElementById(`ci-${postId}`);
+    const text = input.value.trim();
+    if (!text) return;
+    const r = await addComment(postId, text);
+    if (r && r.ok) { input.value = ''; await loadComments(postId); }
+  }
+
+  function startEditComment(cid, text) {
+    const span = document.getElementById(`ctext-${cid}`);
+    span.innerHTML = `<input type="text" id="cedit-${cid}" value="${escAttr(text)}" style="width:200px"/>
+      <button onclick="submitEditComment(${cid})" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.8rem;margin-left:4px">Save</button>
+      <button onclick="loadComments(0)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem">Cancel</button>`;
+    // find parent post
+    const commentEl = document.getElementById(`comment-${cid}`);
+    const section = commentEl.closest('.comments-section');
+    const postId = section.id.replace('comments-','');
+    document.getElementById(`cedit-${cid}`).onkeydown = e => { if(e.key==='Enter') submitEditComment(cid, parseInt(postId)); };
+  }
+
+  async function submitEditComment(cid) {
+    const input = document.getElementById(`cedit-${cid}`);
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    const r = await editComment(cid, text);
+    const commentEl = document.getElementById(`comment-${cid}`);
+    const section = commentEl.closest('.comments-section');
+    const postId = parseInt(section.id.replace('comments-',''));
+    if (r && r.ok) await loadComments(postId);
+  }
+
+  async function doDeleteComment(cid, postId) {
+    if (!confirm('Delete this comment?')) return;
+    const r = await deleteComment(cid);
+    if (r && r.ok) await loadComments(postId);
+  }
+
+  // EDIT POST MODAL (reuse newPostModal for desc editing)
+  let editingPostId = null;
+  function openEditPost(postId, desc) {
+    editingPostId = postId;
+    document.getElementById('npDesc').value = desc;
+    document.getElementById('filePreviews').innerHTML = '';
+    selectedFiles = [];
+    document.getElementById('fileDrop').textContent = '(Editing description only)';
+    document.getElementById('fileDrop').style.pointerEvents = 'none';
+    document.getElementById('fileInput').disabled = true;
+    document.getElementById('newPostModal').classList.add('open');
+  }
+
+  async function doDeletePost(postId) {
+    if (!confirm('Delete this post?')) return;
+    const r = await deletePost(postId);
+    if (r && r.ok) document.getElementById(`post-${postId}`)?.remove();
+  }
+
+  // NEW POST
+  let selectedFiles = [];
+
+  function openNewPost() {
+    editingPostId = null;
+    selectedFiles = [];
+    document.getElementById('filePreviews').innerHTML = '';
+    document.getElementById('npDesc').value = '';
+    document.getElementById('npAlert').classList.remove('show');
+    document.getElementById('fileDrop').textContent = 'Click or drag files here';
+    document.getElementById('fileDrop').style.pointerEvents = '';
+    document.getElementById('fileInput').disabled = false;
+    document.getElementById('newPostModal').classList.add('open');
+  }
+
+  function closeNewPost() {
+    document.getElementById('newPostModal').classList.remove('open');
+  }
+
+  function handleFiles(files) {
+    const remaining = 20 - selectedFiles.length;
+    const toAdd = Array.from(files).slice(0, remaining);
+    selectedFiles.push(...toAdd);
+    renderPreviews();
+  }
+
+  function renderPreviews() {
+    const container = document.getElementById('filePreviews');
+    container.innerHTML = selectedFiles.map((f, i) => {
+      const url = URL.createObjectURL(f);
+      const isVideo = f.type.startsWith('video');
+      return `<div class="file-preview-item">
+        ${isVideo ? `<video src="${url}" muted></video>` : `<img src="${url}"/>`}
+        <button class="file-preview-remove" onclick="removeFile(${i})">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  function removeFile(idx) {
+    selectedFiles.splice(idx, 1);
+    renderPreviews();
+  }
+
+  // Drag-drop
+  const drop = document.getElementById('fileDrop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+
+  async function submitNewPost() {
+    const alertEl = document.getElementById('npAlert');
+    alertEl.classList.remove('show');
+
+    if (editingPostId) {
+      const desc = document.getElementById('npDesc').value;
+      const r = await updatePostDesc(editingPostId, desc);
+      if (r && r.ok) {
+        closeNewPost();
+        await loadFeed(true);
+      } else {
+        alertEl.textContent = r?.data?.message || 'Error'; alertEl.classList.add('show');
+      }
+      return;
+    }
+
+    if (selectedFiles.length === 0) {
+      alertEl.textContent = 'Please select at least one file.'; alertEl.classList.add('show'); return;
+    }
+
+    const fd = new FormData();
+    fd.append('description', document.getElementById('npDesc').value);
+    selectedFiles.forEach(f => fd.append('files', f));
+
+    const res = await createPost(fd);
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { alertEl.textContent = data.message; alertEl.classList.add('show'); return; }
+    closeNewPost();
+    await loadFeed(true);
+  }
+
+  // Helpers
+  function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escAttr(s) { return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+  // Load follow requests badge
+  async function updateReqsBadge() {
+    const r = await getFollowRequests();
+    if (r && r.ok && r.data.requests.length > 0) {
+      const link = document.getElementById('reqsLink');
+      link.innerHTML = `Requests <span class="badge">${r.data.requests.length}</span>`;
+    }
+  }
+
+  loadFeed();
+  updateReqsBadge();
+</script>
+</body>
+</html>

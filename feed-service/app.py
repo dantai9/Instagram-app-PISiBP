@@ -46,6 +46,62 @@ def fetch_posts_for_user(fid, token):
         pass
     return []
 
+# ───────────────────────────── FEED ─────────────────────────────
+
+@app.route('/feed', methods=['GET'])
+@token_required
+def get_feed(user_id, token):
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 100:
+            per_page = 20
+    except ValueError:
+        page, per_page = 1, 20
+
+    # 1. Get list of followed user IDs
+    try:
+        resp = requests.get(
+            f'{USER_SERVICE_URL}/following/{user_id}',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=5
+        )
+        if resp.status_code != 200:
+            return jsonify({'message': 'Failed to get following list'}), 500
+        following_ids = resp.json().get('following', [])
+    except Exception as e:
+        return jsonify({'message': 'Error contacting user service', 'error': str(e)}), 500
+
+    if not following_ids:
+        return jsonify({'feed': [], 'page': page, 'per_page': per_page, 'total': 0})
+
+    # 2. Fetch posts in parallel
+    feed_posts = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_posts_for_user, fid, token): fid for fid in following_ids}
+        for future in as_completed(futures):
+            result = future.result()
+            feed_posts.extend(result)
+
+    # 3. Sort chronologically descending
+    feed_posts.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+    # 4. Paginate
+    total = len(feed_posts)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated = feed_posts[start:end]
+
+    return jsonify({
+        'feed': paginated,
+        'page': page,
+        'per_page': per_page,
+        'total': total,
+        'has_next': end < total
+    })
+
 if __name__ == '__main__':
     app.run(debug=True, port=5002)
 
