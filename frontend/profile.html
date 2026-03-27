@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gramo — Profile</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<style>
+  /* PROFILE HEADER */
+  .profile-hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 2rem;
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .profile-pic-wrap { position: relative; flex-shrink: 0; }
+  .profile-pic-wrap .avatar,
+  .profile-pic-wrap .avatar-placeholder {
+    width: 96px; height: 96px; font-size: 2.2rem;
+  }
+  .profile-pic-edit {
+    position: absolute; bottom: 0; right: 0;
+    background: var(--accent); border: none; border-radius: 50%;
+    width: 26px; height: 26px; font-size: 0.75rem;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: #1a1410;
+  }
+  .profile-info { flex: 1; min-width: 200px; }
+  .profile-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    margin-bottom: 0.15rem;
+  }
+  .profile-username { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.75rem; }
+  .profile-bio { font-size: 0.9rem; line-height: 1.5; color: var(--text); margin-bottom: 1rem; }
+  .profile-stats {
+    display: flex; gap: 1.5rem; margin-bottom: 1rem;
+    font-size: 0.875rem;
+  }
+  .stat-num { font-weight: 500; font-size: 1.1rem; cursor: pointer; }
+  .stat-num:hover { color: var(--accent); }
+  .stat-label { color: var(--muted); font-size: 0.78rem; }
+  .profile-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+  /* EDIT FORM */
+  .edit-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: none;
+  }
+  .edit-form.open { display: block; }
+  .edit-form h3 { font-family: 'Playfair Display', serif; font-style: italic; margin-bottom: 1rem; color: var(--accent); }
+  .form-row { margin-bottom: 1rem; }
+  .edit-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem; }
+
+  /* GALLERY */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    margin-bottom: 2rem;
+  }
+  .gallery-item {
+    aspect-ratio: 1;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    background: var(--surface);
+  }
+  .gallery-item img,
+  .gallery-item video {
+    width: 100%; height: 100%; object-fit: cover;
+    transition: transform 0.2s;
+  }
+  .gallery-item:hover img,
+  .gallery-item:hover video { transform: scale(1.04); }
+  .gallery-item .overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0);
+    display: flex; align-items: center; justify-content: center;
+    gap: 1rem;
+    color: #fff; font-size: 0.85rem; font-weight: 500;
+    transition: background 0.2s;
+  }
+  .gallery-item:hover .overlay { background: rgba(0,0,0,0.45); }
+  .gallery-item .overlay span { display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+  .gallery-item:hover .overlay span { opacity: 1; }
+  .gallery-item .multi-badge {
+    position: absolute; top: 6px; right: 6px;
+    background: rgba(0,0,0,0.6); color: #fff;
+    border-radius: 3px; font-size: 0.65rem; padding: 1px 5px;
+  }
+
+  /* POST LIGHTBOX */
+  .lightbox-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none; align-items: center; justify-content: center;
+    z-index: 300;
+  }
+  .lightbox-overlay.open { display: flex; }
+  .lightbox {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    max-width: 900px;
+    width: 95vw;
+    max-height: 90vh;
+    overflow: hidden;
+  }
+  .lightbox-media {
+    flex: 0 0 55%;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .lightbox-media img, .lightbox-media video {
+    max-width: 100%; max-height: 90vh; object-fit: contain;
+  }
+  .lightbox-info {
+    flex: 1;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .lightbox-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .lightbox-author { font-weight: 500; text-decoration: none; color: var(--text); font-size: 0.9rem; }
+  .lightbox-author:hover { color: var(--accent); }
+  .lightbox-close {
+    margin-left: auto;
+    background: none; border: none; color: var(--muted);
+    font-size: 1.2rem; cursor: pointer;
+  }
+  .lightbox-close:hover { color: var(--text); }
+  .lightbox-body {
+    flex: 1; overflow-y: auto;
+    padding: 1rem;
+  }
+  .lightbox-desc { font-size: 0.875rem; line-height: 1.5; margin-bottom: 1rem; }
+  .lightbox-actions {
+    display: flex; gap: 0.75rem; align-items: center;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .lightbox-comment-input {
+    display: flex; gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .lightbox-comment-input input {
+    flex: 1; background: var(--surface2); border: none;
+    border-radius: 20px; padding: 0.45rem 0.9rem;
+    color: var(--text); font-size: 0.85rem; outline: none;
+  }
+  .lightbox-comment-input input:focus { outline: 1px solid var(--accent); }
+  .lightbox-comment-input button {
+    background: none; border: none; color: var(--accent);
+    font-size: 0.8rem; font-weight: 500; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .lcomment-item { font-size: 0.82rem; margin-bottom: 0.6rem; line-height: 1.4; }
+  .lcomment-author { font-weight: 500; color: var(--accent); margin-right: 0.3rem; }
+  .lcomment-meta { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+  /* FOLLOWERS MODAL */
+  .user-list-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .user-list-item:hover { color: var(--accent); }
+  .user-list-item:last-child { border-bottom: none; }
+  .private-lock {
+    display: inline-block; margin-left: 0.4rem;
+    font-size: 0.75rem; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-wordmark" href="feed.html">Gramo</a>
+  <div style="position:relative;">
+    <input class="nav-search" id="navSearch" type="text" placeholder="Search people…"/>
+    <div id="searchResults"></div>
+  </div>
+  <div class="nav-actions">
+    <a class="nav-btn" href="follow-requests.html" id="reqsLink">Requests</a>
+    <a class="nav-btn" id="myProfileLink" href="#">Profile</a>
+    <button class="nav-btn" onclick="logout()">Sign out</button>
+  </div>
+</nav>
+
+<!-- FOLLOWERS/FOLLOWING MODAL -->
+<div class="modal-overlay" id="usersModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('usersModal').classList.remove('open')">✕</button>
+    <div class="modal-title" id="usersModalTitle">Followers</div>
+    <div id="usersModalList"></div>
+  </div>
+</div>
+
+<!-- POST LIGHTBOX -->
+<div class="lightbox-overlay" id="lightbox">
+  <div class="lightbox">
+    <div class="lightbox-media" id="lbMedia">
+      <button class="carousel-btn prev" style="z-index:3" onclick="lbCarousel(-1)">‹</button>
+      <div id="lbMediaContent"></div>
+      <button class="carousel-btn next" style="z-index:3" onclick="lbCarousel(1)">›</button>
+    </div>
+    <div class="lightbox-info">
+      <div class="lightbox-header">
+        <div id="lbAvatar"></div>
+        <a class="lightbox-author" id="lbAuthor" href="#"></a>
+        <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+      </div>
+      <div class="lightbox-body">
+        <div class="lightbox-desc" id="lbDesc"></div>
+        <div id="lbComments"></div>
+      </div>
+      <div class="lightbox-actions">
+        <button class="action-btn" id="lbLikeBtn" onclick="lbToggleLike()">
+          <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span id="lbLikeCount">0</span>
+        </button>
+      </div>
+      <div class="lightbox-comment-input">
+        <input type="text" id="lbCommentInput" placeholder="Add a comment…" onkeydown="if(event.key==='Enter') lbSubmitComment()"/>
+        <button onclick="lbSubmitComment()">Post</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container-wide">
+  <div id="profileContent"><div class="spinner"></div></div>
+
+  <!-- EDIT PROFILE FORM -->
+  <div class="edit-form" id="editForm">
+    <h3>Edit Profile</h3>
+    <div id="editAlert" class="alert error"></div>
+    <div class="form-row">
+      <label class="field-label">Full Name</label>
+      <input type="text" id="editName"/>
+    </div>
+    <div class="form-row">
+      <label class="field-label">Bio</label>
+      <textarea id="editBio" rows="3"></textarea>
+    </div>
+    <div class="form-row">
+      <label class="field-label">Profile Picture</label>
+      <input type="file" id="editPic" accept="image/*"/>
+    </div>
+    <div class="form-row">
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.9rem">
+        <input type="checkbox" id="editPrivate"/> Private account
+      </label>
+    </div>
+    <div class="edit-actions">
+      <button class="btn ghost" onclick="document.getElementById('editForm').classList.remove('open')">Cancel</button>
+      <button class="btn" onclick="submitEditProfile()">Save</button>
+    </div>
+  </div>
+
+  <div id="galleryContent"></div>
+</div>
+
+<script src="api.js"></script>
+<script>
+  requireAuth();
+  initNavSearch();
+  document.getElementById('myProfileLink').href = `profile.html?id=${getCurrentUserId()}`;
+
+  const params = new URLSearchParams(location.search);
+  const profileId = parseInt(params.get('id')) || getCurrentUserId();
+  const myId = getCurrentUserId();
+  const isOwnProfile = profileId === myId;
+
+  let profileData = null;
+  let profilePosts = [];
+  let lbPostData = null;
+  let lbFileIdx = 0;
+
+  async function loadProfile() {
+    const r = await getProfile(profileId);
+    if (!r || !r.ok) {
+      document.getElementById('profileContent').innerHTML = `<div class="empty"><div class="empty-icon">👤</div><h3>Profile not found</h3></div>`;
+      return;
+    }
+    profileData = r.data;
+    renderProfileHero();
+    await loadGallery();
+  }
+
+  function renderProfileHero() {
+    const p = profileData;
+    const canSeeFull = !p.is_private || p.is_following || isOwnProfile;
+
+    document.getElementById('profileContent').innerHTML = `
+      <div class="profile-hero">
+        <div class="profile-pic-wrap">
+          ${avatarHTML(p, 96)}
+          ${isOwnProfile ? `<button class="profile-pic-edit" onclick="document.getElementById('editPic').click()">✎</button>` : ''}
+        </div>
+        <div class="profile-info">
+          <div class="profile-name">
+            ${escHtml(p.name)}
+            ${p.is_private ? '<span class="private-lock">🔒</span>' : ''}
+          </div>
+          <div class="profile-username">@${escHtml(p.username)}</div>
+          ${p.bio ? `<div class="profile-bio">${escHtml(p.bio)}</div>` : ''}
+          <div class="profile-stats">
+            <div>
+              <div class="stat-num">${p.followers_count}</div>
+              <div class="stat-label">${canSeeFull ? `<span onclick="showUsers('followers')">Followers</span>` : 'Followers'}</div>
+            </div>
+            <div>
+              <div class="stat-num">${p.following_count}</div>
+              <div class="stat-label">${canSeeFull ? `<span onclick="showUsers('following')">Following</span>` : 'Following'}</div>
+            </div>
+          </div>
+          <div class="profile-actions">
+            ${renderProfileActions(p)}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderProfileActions(p) {
+    if (isOwnProfile) {
+      return `<button class="btn ghost" onclick="openEditForm()">Edit Profile</button>`;
+    }
+    const parts = [];
+    if (p.is_following) {
+      parts.push(`<button class="btn ghost" onclick="doUnfollow()">Unfollow</button>`);
+    } else {
+      parts.push(`<button class="btn" onclick="doFollow()">${p.is_private ? 'Request Follow' : 'Follow'}</button>`);
+    }
+    parts.push(`<button class="btn ghost" onclick="doBlock()">Block</button>`);
+    return parts.join('');
+  }
+
+  async function doFollow() {
+    const r = await followUser(profileId);
+    if (r && r.ok) await loadProfile();
+  }
+  async function doUnfollow() {
+    if (!confirm('Unfollow this person?')) return;
+    const r = await unfollowUser(profileId);
+    if (r && r.ok) await loadProfile();
+  }
+  async function doBlock() {
+    if (!confirm('Block this user?')) return;
+    const r = await blockUser(profileId);
+    if (r && r.ok) window.location.href = 'feed.html';
+  }
+
+  function openEditForm() {
+    const p = profileData;
+    document.getElementById('editName').value = p.name || '';
+    document.getElementById('editBio').value = p.bio || '';
+    document.getElementById('editPrivate').checked = p.is_private || false;
+    document.getElementById('editForm').classList.add('open');
+    document.getElementById('editForm').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function submitEditProfile() {
+    const alertEl = document.getElementById('editAlert');
+    alertEl.classList.remove('show');
+    const fd = new FormData();
+    fd.append('name', document.getElementById('editName').value);
+    fd.append('bio', document.getElementById('editBio').value);
+    fd.append('is_private', document.getElementById('editPrivate').checked);
+    const pic = document.getElementById('editPic').files[0];
+    if (pic) fd.append('profile_picture', pic);
+
+    const res = await updateProfile(fd);
+    if (!res) return;
+    if (!res.ok) {
+      const d = await res.json();
+      alertEl.textContent = d.message; alertEl.classList.add('show'); return;
+    }
+    document.getElementById('editForm').classList.remove('open');
+    await loadProfile();
+  }
+
+  async function loadGallery() {
+    const gc = document.getElementById('galleryContent');
+    const p = profileData;
+    const canSeeFull = !p.is_private || p.is_following || isOwnProfile;
+
+    if (!canSeeFull) {
+      gc.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--muted)">
+        <div style="font-size:2rem;margin-bottom:0.5rem">🔒</div>
+        <div>This account is private.</div>
+      </div>`;
+      return;
+    }
+
+    gc.innerHTML = '<div class="spinner"></div>';
+    const r = await getUserPosts(profileId);
+    if (!r || !r.ok) { gc.innerHTML = ''; return; }
+    profilePosts = r.data.posts || [];
+
+    if (profilePosts.length === 0) {
+      gc.innerHTML = `<div class="empty"><div class="empty-icon">📷</div><h3>No posts yet</h3></div>`;
+      return;
+    }
+
+    gc.innerHTML = `<div class="gallery-grid">${profilePosts.map((post, i) => {
+      const first = post.files && post.files[0];
+      const thumb = first
+        ? (first.mimetype && first.mimetype.startsWith('video')
+            ? `<video src="${API_POST}/uploads/${first.filename}" muted></video>`
+            : `<img src="${API_POST}/uploads/${first.filename}" alt=""/>`)
+        : '';
+      return `<div class="gallery-item" onclick="openLightbox(${i})">
+        ${thumb}
+        ${post.files && post.files.length > 1 ? `<div class="multi-badge">◫ ${post.files.length}</div>` : ''}
+        <div class="overlay">
+          <span>♥ ${post.likes_count}</span>
+          <span>💬 ${post.comments_count}</span>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  // ── LIGHTBOX ──────────────────────────────
+  async function openLightbox(postIdx) {
+    const post = profilePosts[postIdx];
+    const r = await getPost(post.id);
+    if (!r || !r.ok) return;
+    lbPostData = r.data;
+    lbFileIdx = 0;
+    renderLightbox();
+    document.getElementById('lightbox').classList.add('open');
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    lbPostData = null;
+  }
+
+  function renderLightbox() {
+    const post = lbPostData;
+    const user = profileData;
+
+    // Media
+    const files = post.files || [];
+    const f = files[lbFileIdx] || {};
+    document.getElementById('lbMediaContent').innerHTML = f.filename
+      ? (f.mimetype && f.mimetype.startsWith('video')
+          ? `<video controls src="${API_POST}/uploads/${f.filename}" style="max-width:100%;max-height:80vh"></video>`
+          : `<img src="${API_POST}/uploads/${f.filename}" style="max-width:100%;max-height:80vh;object-fit:contain" alt=""/>`)
+      : '';
+
+    // Show/hide nav arrows
+    document.querySelector('#lightbox .carousel-btn.prev').style.display = files.length > 1 ? '' : 'none';
+    document.querySelector('#lightbox .carousel-btn.next').style.display = files.length > 1 ? '' : 'none';
+
+    // Header
+    document.getElementById('lbAvatar').innerHTML = avatarHTML(user, 36);
+    const authorEl = document.getElementById('lbAuthor');
+    authorEl.textContent = user.name;
+    authorEl.href = `profile.html?id=${post.author_id}`;
+
+    // Description
+    document.getElementById('lbDesc').textContent = post.description || '';
+
+    // Likes
+    const likeBtn = document.getElementById('lbLikeBtn');
+    likeBtn.className = `action-btn ${post.liked_by_me ? 'liked' : ''}`;
+    document.getElementById('lbLikeCount').textContent = post.likes_count;
+
+    // Comments
+    const comments = post.comments || [];
+    const myId = getCurrentUserId();
+    document.getElementById('lbComments').innerHTML = comments.map(c => `
+      <div class="lcomment-item" id="lbc-${c.id}">
+        <span class="lcomment-author">User ${c.user_id}</span>
+        <span id="lbctext-${c.id}">${escHtml(c.text)}</span>
+        <div class="lcomment-meta">
+          ${timeAgo(c.timestamp)}
+          ${c.user_id === myId ? `
+            <span style="margin-left:0.4rem">
+              · <button onclick="lbStartEditComment(${c.id}, \`${c.text.replace(/`/g,'\\`')}\`)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.7rem;font-family:'DM Sans',sans-serif">Edit</button>
+              · <button onclick="lbDeleteComment(${c.id})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.7rem;font-family:'DM Sans',sans-serif">Delete</button>
+            </span>` : ''}
+        </div>
+      </div>`).join('') || `<div style="color:var(--muted);font-size:0.8rem">No comments yet.</div>`;
+  }
+
+  function lbCarousel(dir) {
+    if (!lbPostData) return;
+    const count = lbPostData.files.length;
+    lbFileIdx = (lbFileIdx + dir + count) % count;
+    const f = lbPostData.files[lbFileIdx];
+    document.getElementById('lbMediaContent').innerHTML = f.mimetype && f.mimetype.startsWith('video')
+      ? `<video controls src="${API_POST}/uploads/${f.filename}" style="max-width:100%;max-height:80vh"></video>`
+      : `<img src="${API_POST}/uploads/${f.filename}" style="max-width:100%;max-height:80vh;object-fit:contain" alt=""/>`;
+  }
+
+  async function lbToggleLike() {
+    if (!lbPostData) return;
+    const r = await likePost(lbPostData.id);
+    if (!r || !r.ok) return;
+    const btn = document.getElementById('lbLikeBtn');
+    const isLiked = btn.classList.toggle('liked');
+    document.getElementById('lbLikeCount').textContent = parseInt(document.getElementById('lbLikeCount').textContent) + (isLiked ? 1 : -1);
+    lbPostData.likes_count += isLiked ? 1 : -1;
+    // Refresh gallery count
+    loadGallery();
+  }
+
+  async function lbSubmitComment() {
+    if (!lbPostData) return;
+    const input = document.getElementById('lbCommentInput');
+    const text = input.value.trim();
+    if (!text) return;
+    const r = await addComment(lbPostData.id, text);
+    if (!r || !r.ok) return;
+    input.value = '';
+    // Reload post to get updated comments
+    const rp = await getPost(lbPostData.id);
+    if (rp && rp.ok) { lbPostData = rp.data; renderLightbox(); }
+  }
+
+  async function lbStartEditComment(cid, text) {
+    const span = document.getElementById(`lbctext-${cid}`);
+    span.innerHTML = `<input type="text" id="lbedit-${cid}" value="${escAttr(text)}" style="width:180px"/>
+      <button onclick="lbSaveEditComment(${cid})" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.75rem;margin-left:4px">Save</button>`;
+  }
+
+  async function lbSaveEditComment(cid) {
+    const input = document.getElementById(`lbedit-${cid}`);
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    const r = await editComment(cid, text);
+    if (r && r.ok) {
+      const rp = await getPost(lbPostData.id);
+      if (rp && rp.ok) { lbPostData = rp.data; renderLightbox(); }
+    }
+  }
+
+  async function lbDeleteComment(cid) {
+    if (!confirm('Delete comment?')) return;
+    const r = await deleteComment(cid);
+    if (r && r.ok) {
+      const rp = await getPost(lbPostData.id);
+      if (rp && rp.ok) { lbPostData = rp.data; renderLightbox(); }
+    }
+  }
+
+  // ── FOLLOWERS/FOLLOWING MODAL ──────────────────
+  async function showUsers(type) {
+    const modal = document.getElementById('usersModal');
+    const title = document.getElementById('usersModalTitle');
+    const list = document.getElementById('usersModalList');
+    title.textContent = type === 'followers' ? 'Followers' : 'Following';
+    list.innerHTML = '<div class="spinner"></div>';
+    modal.classList.add('open');
+
+    const ids = type === 'followers' ? (profileData.followers || []) : (profileData.following || []);
+    if (ids.length === 0) { list.innerHTML = `<div style="color:var(--muted);font-size:0.875rem">None yet.</div>`; return; }
+
+    const users = await Promise.all(ids.map(async id => {
+      const r = await getProfile(id);
+      return r && r.ok ? r.data : null;
+    }));
+
+    list.innerHTML = users.filter(Boolean).map(u => `
+      <a class="user-list-item" href="profile.html?id=${u.id}">
+        ${avatarHTML(u, 36)}
+        <div>
+          <div style="font-size:0.875rem;font-weight:500">${escHtml(u.name)}</div>
+          <div style="font-size:0.75rem;color:var(--muted)">@${escHtml(u.username)}</div>
+        </div>
+        ${isOwnProfile && type === 'followers' ? `<button class="btn ghost sm" style="margin-left:auto" onclick="event.preventDefault();doRemoveFollower(${u.id})">Remove</button>` : ''}
+      </a>`).join('');
+  }
+
+  async function doRemoveFollower(uid) {
+    if (!confirm('Remove this follower?')) return;
+    const r = await removeFollower(uid);
+    if (r && r.ok) { document.getElementById('usersModal').classList.remove('open'); await loadProfile(); }
+  }
+
+  // Close lightbox on overlay click
+  document.getElementById('lightbox').addEventListener('click', e => {
+    if (e.target === document.getElementById('lightbox')) closeLightbox();
+  });
+
+  function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escAttr(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+  loadProfile();
+</script>
+</body>
+</html>
