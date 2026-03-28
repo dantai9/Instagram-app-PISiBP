@@ -417,12 +417,20 @@
     if (!r || !r.ok) return;
     const comments = r.data.comments || [];
     const myId = getCurrentUserId();
-    section.innerHTML = comments.length === 0
-      ? `<div style="color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem">No comments yet.</div>`
-      : comments.map(c => `
-          <div class="comment-item" id="comment-${c.id}">
-            <div style="flex:1">
-              <span class="comment-author">${c.user_id}</span>
+    // fetch usernames for comments
+const commentUserIds = [...new Set(comments.map(c => c.user_id))];
+const commentUsers = {};
+await Promise.all(commentUserIds.map(async id => {
+  const u = await fetchUser(id);
+  commentUsers[id] = u;
+}));
+
+section.innerHTML = comments.length === 0
+  ? `<div style="color:var(--muted);font-size:0.8rem;margin-bottom:0.5rem">No comments yet.</div>`
+  : comments.map(c => `
+      <div class="comment-item" id="comment-${c.id}">
+        <div style="flex:1">
+          <a class="comment-author" href="profile.html?id=${c.user_id}">${commentUsers[c.user_id]?.name || 'User'}</a>
               <span class="comment-text" id="ctext-${c.id}">${escHtml(c.text)}</span>
               <div class="comment-meta">
                 ${timeAgo(c.timestamp)}
@@ -594,6 +602,12 @@
 
   loadFeed();
   updateReqsBadge();
+
+  if (window.location.hash === '#new') {
+    openNewPost();
+    history.replaceState(null, '', 'feed.html');
+}
 </script>
 </body>
 </html>
+
