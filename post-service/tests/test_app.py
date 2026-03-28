@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from api import app, db, Post, File, Like, Comment
+from app import app, db, Post, File, Like, Comment
 
 @pytest.fixture
 def client():
@@ -38,7 +38,7 @@ def fake_image():
 
 # ── CREATE POST ──────────────────────────────
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
 def test_create_post_success(mock_view, client):
     data = {'description': 'Hello', 'files': fake_image()}
     resp = client.post('/posts', data=data, content_type='multipart/form-data', headers=auth())
@@ -54,7 +54,7 @@ def test_create_post_no_files(client):
     resp = client.post('/posts', data={'description': 'No files'}, content_type='multipart/form-data', headers=auth())
     assert resp.status_code == 400
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
 def test_create_post_invalid_file_type(mock_view, client):
     data = {'description': 'Bad file', 'files': (io.BytesIO(b'data'), 'file.exe')}
     resp = client.post('/posts', data=data, content_type='multipart/form-data', headers=auth())
@@ -62,8 +62,8 @@ def test_create_post_invalid_file_type(mock_view, client):
 
 # ── GET POST ──────────────────────────────
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
-@patch('api.get_blocked_ids', return_value=set())
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.get_blocked_ids', return_value=set())
 def test_get_post_success(mock_blocked, mock_view, client):
     with app.app_context():
         post = Post(author_id=1, description='Test post')
@@ -129,7 +129,7 @@ def test_delete_post_not_owner(client):
 
 # ── LIKES ──────────────────────────────
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
 def test_like_post(mock_view, client):
     with app.app_context():
         post = Post(author_id=2, description='Like me')
@@ -140,7 +140,7 @@ def test_like_post(mock_view, client):
     assert resp.status_code == 200
     assert resp.get_json()['message'] == 'Post liked'
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
 def test_unlike_post(mock_view, client):
     with app.app_context():
         post = Post(author_id=2, description='Like me')
@@ -151,7 +151,7 @@ def test_unlike_post(mock_view, client):
     resp = client.post(f'/posts/{pid}/like', headers=auth())
     assert resp.get_json()['message'] == 'Like removed'
 
-@patch('api.can_view_posts_of', return_value=False)
+@patch('app.can_view_posts_of', return_value=False)
 def test_like_private_post_not_following(mock_view, client):
     with app.app_context():
         post = Post(author_id=2, description='Private')
@@ -163,7 +163,7 @@ def test_like_private_post_not_following(mock_view, client):
 
 # ── COMMENTS ──────────────────────────────
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
 def test_add_comment(mock_view, client):
     with app.app_context():
         post = Post(author_id=2, description='Comment me')
@@ -173,7 +173,7 @@ def test_add_comment(mock_view, client):
     resp = client.post(f'/posts/{pid}/comment', json={'text': 'Great post!'}, headers=auth())
     assert resp.status_code == 201
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
 def test_add_empty_comment(mock_view, client):
     with app.app_context():
         post = Post(author_id=2, description='Post')
@@ -233,8 +233,8 @@ def test_delete_comment_not_owner(client):
 
 # ── USER POSTS ──────────────────────────────
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
-@patch('api.get_blocked_ids', return_value=set())
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.get_blocked_ids', return_value=set())
 def test_get_user_posts(mock_blocked, mock_view, client):
     with app.app_context():
         for i in range(3):
@@ -244,7 +244,7 @@ def test_get_user_posts(mock_blocked, mock_view, client):
     assert resp.status_code == 200
     assert len(resp.get_json()['posts']) == 3
 
-@patch('api.can_view_posts_of', return_value=False)
+@patch('app.can_view_posts_of', return_value=False)
 def test_get_user_posts_private(mock_view, client):
     with app.app_context():
         db.session.add(Post(author_id=2, description='Private'))
@@ -255,8 +255,8 @@ def test_get_user_posts_private(mock_view, client):
 
 # ── BLOCKED USERS FILTER ──────────────────────────────
 
-@patch('api.can_view_posts_of', side_effect=mock_can_view)
-@patch('api.get_blocked_ids', return_value={99})
+@patch('app.can_view_posts_of', side_effect=mock_can_view)
+@patch('app.get_blocked_ids', return_value={99})
 def test_blocked_likes_not_counted(mock_blocked, mock_view, client):
     with app.app_context():
         post = Post(author_id=2, description='Post')
