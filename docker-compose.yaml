@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-changeme_in_production}
+      - UPLOAD_FOLDER=/app/uploads
+    volumes:
+      - user_uploads:/app/uploads
+      - user_db:/app/instance
+    restart: unless-stopped
+
+  post-service:
+    build: ./post-service
+    ports:
+      - "5001:5001"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-changeme_in_production}
+      - USER_SERVICE_URL=http://user-service:5000
+      - UPLOAD_FOLDER=/app/uploads
+    volumes:
+      - post_uploads:/app/uploads
+      - post_db:/app/instance
+    depends_on:
+      - user-service
+    restart: unless-stopped
+
+  feed-service:
+    build: ./feed-service
+    ports:
+      - "5002:5002"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-changeme_in_production}
+      - USER_SERVICE_URL=http://user-service:5000
+      - POST_SERVICE_URL=http://post-service:5001
+    depends_on:
+      - user-service
+      - post-service
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - user-service
+      - post-service
+      - feed-service
+    restart: unless-stopped
+
+volumes:
+  user_uploads:
+  user_db:
+  post_uploads:
+  post_db:
