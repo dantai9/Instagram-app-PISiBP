@@ -130,7 +130,7 @@ def can_view_posts_of(viewer_id, author_id, token):
         pass
     return False
 
-def serialize_post(post, blocked_ids, full_comments=False):
+def serialize_post(post, blocked_ids, full_comments=False, viewer_id=None):
     visible_likes = [l for l in post.likes if l.user_id not in blocked_ids]
     visible_comments = [c for c in post.comments if c.user_id not in blocked_ids]
     result = {
@@ -141,6 +141,7 @@ def serialize_post(post, blocked_ids, full_comments=False):
         'files': [{'id': f.id, 'filename': f.filename, 'mimetype': f.mimetype} for f in post.files],
         'likes_count': len(visible_likes),
         'comments_count': len(visible_comments),
+        'liked_by_me': any(l.user_id == viewer_id for l in visible_likes) if viewer_id else False,
     }
     if full_comments:
         result['comments'] = [
@@ -198,7 +199,7 @@ def get_post(user_id, post_id):
         return jsonify({'message': 'Cannot view this post'}), 403
 
     blocked_ids = get_blocked_ids(user_id, token)
-    return jsonify(serialize_post(post, blocked_ids, full_comments=True))
+    return jsonify(serialize_post(post, blocked_ids, full_comments=True, viewer_id=user_id))
 
 @app.route('/posts/<int:post_id>', methods=['PUT'])
 @token_required
@@ -342,7 +343,7 @@ def user_posts(user_id, author_id):
 
     blocked_ids = get_blocked_ids(user_id, token)
     posts = Post.query.filter_by(author_id=author_id).order_by(Post.timestamp.desc()).all()
-    return jsonify({'posts': [serialize_post(p, blocked_ids) for p in posts]})
+    return jsonify({'posts': [serialize_post(p, blocked_ids, viewer_id=user_id) for p in posts]})
 
 # ───────────────────────────── STATIC FILES ─────────────────────────────
 
