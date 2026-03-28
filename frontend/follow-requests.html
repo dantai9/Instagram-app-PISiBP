@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gramo — Follow Requests</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<style>
+  .page-title {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.6rem;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+  }
+  .request-item {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    margin-bottom: 0.75rem;
+    animation: fadeUp 0.2s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(6px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+  .request-info { flex: 1; }
+  .request-name { font-weight: 500; font-size: 0.9rem; }
+  .request-username { font-size: 0.78rem; color: var(--muted); }
+  .request-time { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .request-actions { display: flex; gap: 0.5rem; }
+  .empty {
+    text-align: center; padding: 4rem 2rem; color: var(--muted);
+  }
+  .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+  .empty h3 { font-family: 'Playfair Display', serif; font-style: italic; margin-bottom: 0.5rem; color: var(--text); }
+</style>
+</head>
+<body>
+<nav>
+  <a class="nav-wordmark" href="feed.html">Gramo</a>
+  <div style="position:relative;">
+    <input class="nav-search" id="navSearch" type="text" placeholder="Search people…"/>
+    <div id="searchResults"></div>
+  </div>
+  <div class="nav-actions">
+    <a class="nav-btn" id="myProfileLink" href="#">Profile</a>
+    <button class="nav-btn" onclick="logout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-title">Follow Requests</div>
+  <div id="requestsList"><div class="spinner"></div></div>
+</div>
+
+<script src="api.js"></script>
+<script>
+  requireAuth();
+  initNavSearch();
+  document.getElementById('myProfileLink').href = `profile.html?id=${getCurrentUserId()}`;
+
+  const userCache = {};
+  async function fetchUser(id) {
+    if (userCache[id]) return userCache[id];
+    const r = await getProfile(id);
+    if (r && r.ok) { userCache[id] = r.data; return r.data; }
+    return { name: 'User', username: 'user', profile_picture: null };
+  }
+
+  async function load() {
+    const container = document.getElementById('requestsList');
+    const r = await getFollowRequests();
+    if (!r || !r.ok) { container.innerHTML = '<div class="empty"><div class="empty-icon">⚠</div><p>Failed to load requests.</p></div>'; return; }
+    const reqs = r.data.requests;
+    if (reqs.length === 0) {
+      container.innerHTML = `<div class="empty">
+        <div class="empty-icon">✓</div>
+        <h3>All clear</h3>
+        <p>No pending follow requests.</p>
+      </div>`;
+      return;
+    }
+    container.innerHTML = '';
+    for (const req of reqs) {
+      const user = await fetchUser(req.sender_id);
+      const div = document.createElement('div');
+      div.className = 'request-item';
+      div.id = `req-${req.id}`;
+      div.innerHTML = `
+        <a href="profile.html?id=${req.sender_id}">${avatarHTML(user, 44)}</a>
+        <div class="request-info">
+          <div class="request-name">
+            <a href="profile.html?id=${req.sender_id}" style="color:var(--text);text-decoration:none;font-weight:500">${escHtml(user.name)}</a>
+          </div>
+          <div class="request-username">@${escHtml(user.username)}</div>
+          <div class="request-time">${timeAgo(req.timestamp)}</div>
+        </div>
+        <div class="request-actions">
+          <button class="btn sm" onclick="accept(${req.id})">Accept</button>
+          <button class="btn ghost sm" onclick="reject(${req.id})">Decline</button>
+        </div>`;
+      container.appendChild(div);
+    }
+  }
+
+  async function accept(id) {
+    const r = await acceptFollowRequest(id);
+    if (r && r.ok) document.getElementById(`req-${id}`)?.remove();
+    checkEmpty();
+  }
+
+  async function reject(id) {
+    const r = await rejectFollowRequest(id);
+    if (r && r.ok) document.getElementById(`req-${id}`)?.remove();
+    checkEmpty();
+  }
+
+  function checkEmpty() {
+    const c = document.getElementById('requestsList');
+    if (c.children.length === 0) c.innerHTML = `<div class="empty"><div class="empty-icon">✓</div><h3>All done</h3><p>No more pending requests.</p></div>`;
+  }
+
+  function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  load();
+</script>
+</body>
+</html>
