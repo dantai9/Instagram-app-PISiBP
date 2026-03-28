@@ -153,11 +153,12 @@
   }
   .lightbox-desc { font-size: 0.875rem; line-height: 1.5; margin-bottom: 1rem; }
   .lightbox-actions {
-    display: flex; gap: 0.75rem; align-items: center;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--border);
-    flex-shrink: 0;
-  }
+  display: flex; gap: 0.75rem; align-items: center;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface);
+}
   .lightbox-comment-input {
     display: flex; gap: 0.5rem;
     padding: 0.75rem 1rem;
@@ -194,6 +195,33 @@
     display: inline-block; margin-left: 0.4rem;
     font-size: 0.75rem; color: var(--muted);
   }
+
+  .action-btn {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem;
+    transition: color 0.15s; padding: 0;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .action-btn:hover { color: var(--accent); }
+  .action-btn.liked { color: var(--accent); }
+  .action-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .action-btn.liked svg { fill: var(--accent); }
+
+
+.fab {
+    position: fixed; bottom: 2rem; right: 2rem;
+    background: var(--accent); color: #1a1410;
+    border: none; border-radius: 50%;
+    width: 52px; height: 52px;
+    font-size: 1.6rem; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(200,169,126,0.3);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s, background 0.2s;
+    z-index: 50;
+  }
+  .fab:hover { transform: scale(1.08); background: var(--accent2); }
+
+
 </style>
 </head>
 <body>
@@ -233,6 +261,7 @@
       <div class="lightbox-header">
         <div id="lbAvatar"></div>
         <a class="lightbox-author" id="lbAuthor" href="#"></a>
+        <div id="lbPostActions" style="display:flex;gap:0.5rem;margin-left:auto;align-items:center"></div>
         <button class="lightbox-close" onclick="closeLightbox()">✕</button>
       </div>
       <div class="lightbox-body">
@@ -240,6 +269,7 @@
         <div id="lbComments"></div>
       </div>
       <div class="lightbox-actions">
+
         <button class="action-btn" id="lbLikeBtn" onclick="lbToggleLike()">
           <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <span id="lbLikeCount">0</span>
@@ -331,14 +361,14 @@
           <div class="profile-username">@${escHtml(p.username)}</div>
           ${p.bio ? `<div class="profile-bio">${escHtml(p.bio)}</div>` : ''}
           <div class="profile-stats">
-            <div>
-              <div class="stat-num">${p.followers_count}</div>
-              <div class="stat-label">${canSeeFull ? `<span onclick="showUsers('followers')">Followers</span>` : 'Followers'}</div>
-            </div>
-            <div>
-              <div class="stat-num">${p.following_count}</div>
-              <div class="stat-label">${canSeeFull ? `<span onclick="showUsers('following')">Following</span>` : 'Following'}</div>
-            </div>
+              <div style="cursor:${canSeeFull ? 'pointer' : 'default'}" onclick="${canSeeFull ? 'showUsers(\'followers\')' : ''}">
+                <div class="stat-num">${p.followers_count}</div>
+                <div class="stat-label">Followers</div>
+              </div>
+              <div style="cursor:${canSeeFull ? 'pointer' : 'default'}" onclick="${canSeeFull ? 'showUsers(\'following\')' : ''}">
+                <div class="stat-num">${p.following_count}</div>
+                <div class="stat-label">Following</div>
+              </div>
           </div>
           <div class="profile-actions">
             ${renderProfileActions(p)}
@@ -353,9 +383,11 @@
     }
     const parts = [];
     if (p.is_following) {
-      parts.push(`<button class="btn ghost" onclick="doUnfollow()">Unfollow</button>`);
+    parts.push(`<button class="btn ghost" onclick="doUnfollow()">Unfollow</button>`);
+    } else if (p.follow_requested) {
+        parts.push(`<button class="btn ghost" disabled>Request Sent</button>`);
     } else {
-      parts.push(`<button class="btn" onclick="doFollow()">${p.is_private ? 'Request Follow' : 'Follow'}</button>`);
+        parts.push(`<button class="btn" onclick="doFollow()">${p.is_private ? 'Request Follow' : 'Follow'}</button>`);
     }
     parts.push(`<button class="btn ghost" onclick="doBlock()">Block</button>`);
     return parts.join('');
@@ -391,7 +423,7 @@
     const fd = new FormData();
     fd.append('name', document.getElementById('editName').value);
     fd.append('bio', document.getElementById('editBio').value);
-    fd.append('is_private', document.getElementById('editPrivate').checked);
+    fd.append('is_private', document.getElementById('editPrivate').checked ? 'true' : 'false');
     const pic = document.getElementById('editPic').files[0];
     if (pic) fd.append('profile_picture', pic);
 
@@ -492,13 +524,22 @@
     const likeBtn = document.getElementById('lbLikeBtn');
     likeBtn.className = `action-btn ${post.liked_by_me ? 'liked' : ''}`;
     document.getElementById('lbLikeCount').textContent = post.likes_count;
+    const actionsDiv = document.getElementById('lbPostActions');
+if (post.author_id === getCurrentUserId()) {
+    actionsDiv.innerHTML = `
+        <button class="btn ghost sm" onclick="lbEditPost()">Edit</button>
+        <button class="btn danger sm" onclick="lbDeletePost()">Delete</button>
+    `;
+} else {
+    actionsDiv.innerHTML = '';
+}
 
     // Comments
     const comments = post.comments || [];
     const myId = getCurrentUserId();
     document.getElementById('lbComments').innerHTML = comments.map(c => `
       <div class="lcomment-item" id="lbc-${c.id}">
-        <span class="lcomment-author">User ${c.user_id}</span>
+        <span class="lcomment-author">${profileData?.name || 'User'}</span>
         <span id="lbctext-${c.id}">${escHtml(c.text)}</span>
         <div class="lcomment-meta">
           ${timeAgo(c.timestamp)}
@@ -616,6 +657,25 @@
   function escAttr(s) { return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
   loadProfile();
+  async function lbEditPost() {
+    const desc = prompt('New description:', lbPostData.description || '');
+    if (desc === null) return;
+    const r = await updatePostDesc(lbPostData.id, desc);
+    if (r && r.ok) {
+        const rp = await getPost(lbPostData.id);
+        if (rp && rp.ok) { lbPostData = rp.data; renderLightbox(); }
+        await loadGallery();
+    }
+}
+
+async function lbDeletePost() {
+    if (!confirm('Delete post?')) return;
+    const r = await deletePost(lbPostData.id);
+    if (r && r.ok) { closeLightbox(); await loadGallery(); }
+}
 </script>
+<button class="fab" onclick="window.location.href='feed.html#new'" title="New post">+</button>
+
 </body>
 </html>
+
