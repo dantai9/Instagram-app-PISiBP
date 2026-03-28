@@ -55,9 +55,12 @@ async function getProfile(userId) {
 }
 
 async function updateProfile(formData) {
-  return apiFetch(`${API_USER}/profile`, { method: 'PUT', body: formData });
+  return fetch(`${API_USER}/profile`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${getToken()}` },
+    body: formData
+  });
 }
-
 async function followUser(userId) {
   return apiJson(`${API_USER}/follow/${userId}`, { method: 'POST' });
 }
@@ -158,7 +161,7 @@ function avatarHTML(user, size = 36) {
 }
 
 function timeAgo(isoString) {
-  const diff = (Date.now() - new Date(isoString)) / 1000;
+  const diff = (Date.now() - new Date(isoString+'Z')) / 1000;
   if (diff < 60) return 'just now';
   if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
