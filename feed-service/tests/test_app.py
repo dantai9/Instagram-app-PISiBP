@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from api import app
+from app import app
 
 @pytest.fixture
 def client():
@@ -46,7 +46,7 @@ def test_feed_invalid_token(client):
 
 # ── FEED ──────────────────────────────
 
-@patch('api.requests.get')
+@patch('app.requests.get')
 def test_feed_empty_following(mock_get, client):
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'following': []})
     resp = client.get('/feed', headers=auth())
@@ -55,14 +55,14 @@ def test_feed_empty_following(mock_get, client):
     assert data['feed'] == []
     assert data['total'] == 0
 
-@patch('api.requests.get')
+@patch('app.requests.get')
 def test_feed_following_service_fails(mock_get, client):
     mock_get.return_value = MagicMock(status_code=500)
     resp = client.get('/feed', headers=auth())
     assert resp.status_code == 500
 
-@patch('api.fetch_posts_for_user')
-@patch('api.requests.get')
+@patch('app.fetch_posts_for_user')
+@patch('app.requests.get')
 def test_feed_returns_posts_sorted(mock_get, mock_fetch, client):
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'following': [2, 3]})
     mock_fetch.side_effect = [
@@ -77,8 +77,8 @@ def test_feed_returns_posts_sorted(mock_get, mock_fetch, client):
     assert feed[0]['id'] == 2
     assert feed[1]['id'] == 1
 
-@patch('api.fetch_posts_for_user')
-@patch('api.requests.get')
+@patch('app.fetch_posts_for_user')
+@patch('app.requests.get')
 def test_feed_pagination(mock_get, mock_fetch, client):
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'following': [2]})
     posts = [make_post(2, i) for i in range(15)]
@@ -89,8 +89,8 @@ def test_feed_pagination(mock_get, mock_fetch, client):
     assert data['has_next'] == True
     assert data['total'] == 15
 
-@patch('api.fetch_posts_for_user')
-@patch('api.requests.get')
+@patch('app.fetch_posts_for_user')
+@patch('app.requests.get')
 def test_feed_pagination_page_2(mock_get, mock_fetch, client):
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'following': [2]})
     posts = [make_post(2, i) for i in range(15)]
@@ -100,8 +100,8 @@ def test_feed_pagination_page_2(mock_get, mock_fetch, client):
     assert len(data['feed']) == 5
     assert data['has_next'] == False
 
-@patch('api.fetch_posts_for_user')
-@patch('api.requests.get')
+@patch('app.fetch_posts_for_user')
+@patch('app.requests.get')
 def test_feed_has_next_false_when_all_loaded(mock_get, mock_fetch, client):
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'following': [2]})
     posts = [make_post(2, i) for i in range(5)]
@@ -110,16 +110,16 @@ def test_feed_has_next_false_when_all_loaded(mock_get, mock_fetch, client):
     data = resp.get_json()
     assert data['has_next'] == False
 
-@patch('api.fetch_posts_for_user')
-@patch('api.requests.get')
+@patch('app.fetch_posts_for_user')
+@patch('app.requests.get')
 def test_feed_invalid_pagination_defaults(mock_get, mock_fetch, client):
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'following': [2]})
     mock_fetch.return_value = [make_post(2, 1)]
     resp = client.get('/feed?page=abc&per_page=xyz', headers=auth())
     assert resp.status_code == 200
 
-@patch('api.fetch_posts_for_user', return_value=[])
-@patch('api.requests.get')
+@patch('app.fetch_posts_for_user', return_value=[])
+@patch('app.requests.get')
 def test_feed_post_service_down(mock_get, mock_fetch, client):
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'following': [2, 3]})
     resp = client.get('/feed', headers=auth())
@@ -128,22 +128,22 @@ def test_feed_post_service_down(mock_get, mock_fetch, client):
 
 # ── FETCH POSTS FOR USER ──────────────────────────────
 
-@patch('api.requests.get')
+@patch('app.requests.get')
 def test_fetch_posts_for_user_success(mock_get, client):
-    from api import fetch_posts_for_user
+    from app import fetch_posts_for_user
     mock_get.return_value = MagicMock(status_code=200, json=lambda: {'posts': [make_post(2, 1)]})
     result = fetch_posts_for_user(2, 'token')
     assert len(result) == 1
 
-@patch('api.requests.get')
+@patch('app.requests.get')
 def test_fetch_posts_for_user_failure(mock_get, client):
-    from api import fetch_posts_for_user
+    from app import fetch_posts_for_user
     mock_get.return_value = MagicMock(status_code=403)
     result = fetch_posts_for_user(2, 'token')
     assert result == []
 
-@patch('api.requests.get', side_effect=Exception('timeout'))
+@patch('app.requests.get', side_effect=Exception('timeout'))
 def test_fetch_posts_for_user_exception(mock_get, client):
-    from api import fetch_posts_for_user
+    from app import fetch_posts_for_user
     result = fetch_posts_for_user(2, 'token')
     assert result == []
