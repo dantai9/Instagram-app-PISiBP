@@ -1,12 +1,8 @@
 # Dockerfile
-FROM python:3.13-slim
-
+FROM python:3.11-slim
 WORKDIR /app
-
-COPY . .
-
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-EXPOSE 5000
-
+COPY . .
+RUN mkdir -p /app/instance /app/uploads
 CMD ["python", "app.py"]
