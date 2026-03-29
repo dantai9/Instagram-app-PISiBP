@@ -1,0 +1,112 @@
+name: Main — Tests + Docker Build + Push
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-user-service:
+    name: Unit Tests — user-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: user-service
+        run: pip install -r requirements.txt pytest pytest-cov
+      - name: Run tests
+        working-directory: user-service
+        run: pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
+
+  test-post-service:
+    name: Unit Tests — post-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: post-service
+        run: pip install -r requirements.txt pytest pytest-cov
+      - name: Run tests
+        working-directory: post-service
+        run: pytest tests/ -v --cov=api --cov-report=term-missing --cov-fail-under=70
+
+  test-feed-service:
+    name: Unit Tests — feed-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: feed-service
+        run: pip install -r requirements.txt pytest pytest-cov
+      - name: Run tests
+        working-directory: feed-service
+        run: pytest tests/ -v --cov=api --cov-report=term-missing --cov-fail-under=70
+
+  test-frontend:
+    name: Unit Tests — frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Run tests
+        working-directory: frontend
+        run: npm test
+
+  docker-build-push:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [test-user-service, test-post-service, test-feed-service, test-frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate timestamp tag
+        id: tag
+        run: echo "TAG=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push user-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./user-service
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/user-service:${{ steps.tag.outputs.TAG }}
+
+      - name: Build and push post-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./post-service
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/post-service:${{ steps.tag.outputs.TAG }}
+
+      - name: Build and push feed-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./feed-service
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/feed-service:${{ steps.tag.outputs.TAG }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/frontend:${{ steps.tag.outputs.TAG }}

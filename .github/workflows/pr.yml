@@ -1,0 +1,83 @@
+name: PR Checks — Unit Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-user-service:
+    name: Unit Tests — user-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: user-service
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run tests
+        working-directory: user-service
+        run: pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
+
+  test-post-service:
+    name: Unit Tests — post-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: post-service
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run tests
+        working-directory: post-service
+        run: pytest tests/ -v --cov=api --cov-report=term-missing --cov-fail-under=70
+
+  test-feed-service:
+    name: Unit Tests — feed-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: feed-service
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run tests
+        working-directory: feed-service
+        run: pytest tests/ -v --cov=api --cov-report=term-missing --cov-fail-under=70
+
+  test-frontend:
+    name: Unit Tests — frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Run tests with coverage
+        working-directory: frontend
+        run: npm test
