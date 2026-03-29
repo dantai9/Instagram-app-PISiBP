@@ -164,6 +164,12 @@ def get_profile(current_user, user_id):
     is_following = current_user in user.followers
     can_see_full = (not user.is_private) or is_following or (current_user.id == user_id)
 
+    pending_request = FollowRequest.query.filter_by(
+        sender_id=current_user.id,
+        receiver_id=user_id,
+        status='pending'
+    ).first()
+
     base = {
         'id': user.id,
         'username': user.username,
@@ -174,6 +180,7 @@ def get_profile(current_user, user_id):
         'followers_count': len(user.followers),
         'following_count': len(user.following),
         'is_following': is_following,
+        'follow_requested': pending_request is not None,
     }
 
     if can_see_full:
@@ -182,10 +189,12 @@ def get_profile(current_user, user_id):
 
     return jsonify(base)
 
+
 @app.route('/profile', methods=['PUT'])
 @token_required
 def update_profile(current_user):
-    data = request.form if request.files else request.json or {}
+    # Always try form data first, then JSON
+    data = request.form if request.form else (request.json or {})
 
     if 'name' in data and data['name']:
         current_user.name = data['name']
@@ -193,12 +202,12 @@ def update_profile(current_user):
         current_user.bio = data['bio']
     if 'is_private' in data:
         val = data['is_private']
-        current_user.is_private = val if isinstance(val, bool) else val.lower() == 'true'
+        current_user.is_private = val if isinstance(val, bool) else str(val).lower() == 'true'
 
-    # Profile picture upload
+    # Profile picture upload — optional
     if 'profile_picture' in request.files:
         f = request.files['profile_picture']
-        if f and allowed_image(f.filename):
+        if f and f.filename and allowed_image(f.filename):
             filename = f"{uuid.uuid4().hex}_{secure_filename(f.filename)}"
             f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             current_user.profile_picture = filename
@@ -207,7 +216,6 @@ def update_profile(current_user):
 
     db.session.commit()
     return jsonify({'message': 'Profile updated'})
-
 # ───────────────────────────── FOLLOW ─────────────────────────────
 
 @app.route('/follow/<int:user_id>', methods=['POST'])
@@ -314,6 +322,80 @@ def reject_follow_request(current_user, req_id):
     req.status = 'rejected'
     db.session.commit()
     return jsonify({'message': 'Follow request rejected'})
+
+# ───────────────────────────── BLOCK ─────────────────────────────
+
+@app.route('/block/<int:user_id>', methods=['POST'])
+@token_required
+def block(current_user, user_id):
+    if current_user.id == user_id:
+        return jsonify({'message': 'Cannot block yourself'}), 400
+    target = User.query.get(user_id)
+    if not target:
+        return jsonify({'message': 'User not found'}), 404
+    if target in current_user.blocked_users:
+        return jsonify({'message': 'Already blocked'}), 400
+
+    current_user.blocked_users.append(target)
+
+    # Auto-unfollow both directions
+    if target in current_user.following:
+        current_user.following.remove(target)
+    if current_user in target.following:
+        target.following.remove(current_user)
+
+    # Cancel any pending follow requests between them
+    FollowRequest.query.filter(
+        ((FollowRequest.sender_id == current_user.id) & (FollowRequest.receiver_id == user_id)) |
+        ((FollowRequest.sender_id == user_id) & (FollowRequest.receiver_id == current_user.id))
+    ).delete()
+
+    db.session.commit()
+    return jsonify({'message': 'User blocked'})
+
+@app.route('/unblock/<int:user_id>', methods=['POST'])
+@token_required
+def unblock(current_user, user_id):
+    target = User.query.get(user_id)
+    if not target:
+        return jsonify({'message': 'User not found'}), 404
+    if target not in current_user.blocked_users:
+        return jsonify({'message': 'User is not blocked'}), 400
+    current_user.blocked_users.remove(target)
+    db.session.commit()
+    return jsonify({'message': 'User unblocked'})
+
+@app.route('/blocked-ids', methods=['GET'])
+@token_required
+def get_blocked_ids(current_user):
+    """Returns IDs blocked by or blocking current user. Used by post-service."""
+    blocked_by_me = [u.id for u in current_user.blocked_users]
+    blocking_me = [u.id for u in current_user.blocked_by]
+    all_blocked = list(set(blocked_by_me + blocking_me))
+    return jsonify({'blocked_ids': all_blocked})
+
+# ───────────────────────────── SEARCH ─────────────────────────────
+
+@app.route('/search', methods=['GET'])
+@token_required
+def search(current_user):
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify({'users': []})
+    results = User.query.filter(
+        (User.username.ilike(f'%{q}%')) | (User.name.ilike(f'%{q}%'))
+    ).all()
+    blocked_ids = set(u.id for u in current_user.blocked_users) | set(u.id for u in current_user.blocked_by)
+    return jsonify({'users': [
+        {'id': u.id, 'username': u.username, 'name': u.name, 'profile_picture': u.profile_picture}
+        for u in results if u.id not in blocked_ids and u.id != current_user.id
+    ]})
+
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
