@@ -1,0 +1,22 @@
+{
+  "name": "gramo-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest --coverage",
+    "test:ci": "jest --coverage --coverageReporters=text --coverageThreshold='{\"global\":{\"lines\":10}}'"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "collectCoverage": true,
+    "collectCoverageFrom": [
+      "api.js"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ]
+  }
+}
