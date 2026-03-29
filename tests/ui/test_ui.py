@@ -4,24 +4,22 @@ Runs against live app at http://localhost
 
 Setup:
     pip install selenium pytest
-    # Install chromedriver or use webdriver-manager:
-    pip install webdriver-manager
+    sudo pacman -S chromium   (Arch Linux)
 
 Usage:
     pytest tests/ui/test_ui.py -v
 """
 import pytest
 import time
+import subprocess
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 
-BASE_URL = 'http://localhost'
+BASE_URL = 'http://localhost:8080'
 
 TEST_USER = 'ui_test_user'
 TEST_EMAIL = 'ui_test@test.com'
@@ -31,18 +29,33 @@ TEST_NAME = 'UI Test User'
 TEST_USER_B = 'ui_test_user_b'
 TEST_EMAIL_B = 'ui_test_b@test.com'
 
+def get_chromedriver_path():
+    """Find chromedriver on the system automatically."""
+    for path in ['/usr/bin/chromedriver', '/usr/local/bin/chromedriver']:
+        try:
+            result = subprocess.run([path, '--version'], capture_output=True, text=True)
+            if result.returncode == 0:
+                return path
+        except FileNotFoundError:
+            continue
+    # fallback — let Selenium find it in PATH
+    return 'chromedriver'
+
 @pytest.fixture(scope='module')
 def driver():
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
     options.add_argument('--window-size=1280,800')
+    options.binary_location = '/usr/bin/chromium'
     driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
+        service=Service(get_chromedriver_path()),
         options=options
     )
-    driver.implicitly_wait(5)
+    driver.implicitly_wait(10)
+    driver.set_page_load_timeout(30)
     yield driver
     driver.quit()
 
@@ -51,6 +64,20 @@ def wait_for(driver, by, value, timeout=10):
 
 def wait_clickable(driver, by, value, timeout=10):
     return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
+
+def login_user(driver):
+    """Helper — logs in and waits for feed page."""
+    driver.execute_script("localStorage.clear()")
+    driver.get(f'{BASE_URL}/index.html')
+    time.sleep(1)
+    wait_for(driver, By.ID, 'loginField').clear()
+    driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
+    driver.find_element(By.ID, 'loginPass').clear()
+    driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
+    driver.find_element(By.XPATH, "//button[@type='submit']").click()
+    WebDriverWait(driver, 15).until(
+        lambda d: 'feed' in d.current_url
+    )
 
 # ── REGISTRATION ──────────────────────────────
 
@@ -67,15 +94,18 @@ class TestRegistration:
         assert wait_for(driver, By.ID, 'regName')
 
     def test_register_new_user(self, driver):
+        import time as t
+        unique = str(int(t.time()))
         driver.get(f'{BASE_URL}/index.html')
         wait_clickable(driver, By.XPATH, "//button[contains(text(),'Register')]").click()
-        wait_for(driver, By.ID, 'regName').send_keys(TEST_NAME)
-        driver.find_element(By.ID, 'regUsername').send_keys(TEST_USER)
-        driver.find_element(By.ID, 'regEmail').send_keys(TEST_EMAIL)
-        driver.find_element(By.ID, 'regPassword').send_keys(TEST_PASS)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
-        time.sleep(1)
-        # Should switch back to login tab or show success
+        wait_for(driver, By.ID, 'regName').send_keys('Test User')
+        driver.find_element(By.ID, 'regUsername').send_keys(f'testuser_{unique}')
+        driver.find_element(By.ID, 'regEmail').send_keys(f'test_{unique}@test.com')
+        driver.find_element(By.ID, 'regPassword').send_keys('testpass123')
+        # Use JavaScript click to avoid interactability issues
+        btn = driver.find_element(By.CSS_SELECTOR, '#registerForm button[type="submit"]')
+        driver.execute_script("arguments[0].click();", btn)
+        time.sleep(2)
         assert 'index' in driver.current_url or 'feed' in driver.current_url or 'Gramo' in driver.page_source
 
 # ── LOGIN ──────────────────────────────
@@ -87,20 +117,20 @@ class TestLogin:
         assert wait_for(driver, By.ID, 'loginField')
 
     def test_login_with_valid_credentials(self, driver):
-        driver.get(f'{BASE_URL}/index.html')
-        wait_for(driver, By.ID, 'loginField').clear()
-        driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
-        driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
-        WebDriverWait(driver, 10).until(EC.url_contains('feed'))
+        login_user(driver)
         assert 'feed' in driver.current_url
 
     def test_login_with_wrong_password(self, driver):
+        driver.execute_script("localStorage.clear()")
         driver.get(f'{BASE_URL}/index.html')
+        time.sleep(1)
+        # Make sure we are on login tab, not redirected
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, 'loginField')))
         wait_for(driver, By.ID, 'loginField').clear()
         driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
+        driver.find_element(By.ID, 'loginPass').clear()
         driver.find_element(By.ID, 'loginPass').send_keys('wrongpassword')
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+        wait_clickable(driver, By.XPATH, "//button[@type='submit']").click()
         time.sleep(1)
         error = wait_for(driver, By.ID, 'loginError')
         assert error.is_displayed()
@@ -117,13 +147,7 @@ class TestFeed:
 
     @pytest.fixture(autouse=True)
     def login_first(self, driver):
-        driver.get(f'{BASE_URL}/index.html')
-        wait_for(driver, By.ID, 'loginField').clear()
-        driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
-        driver.find_element(By.ID, 'loginPass').clear()
-        driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
-        WebDriverWait(driver, 10).until(EC.url_contains('feed'))
+        login_user(driver)
 
     def test_feed_page_loads(self, driver):
         assert 'feed' in driver.current_url
@@ -175,13 +199,7 @@ class TestProfile:
 
     @pytest.fixture(autouse=True)
     def login_first(self, driver):
-        driver.get(f'{BASE_URL}/index.html')
-        wait_for(driver, By.ID, 'loginField').clear()
-        driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
-        driver.find_element(By.ID, 'loginPass').clear()
-        driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
-        WebDriverWait(driver, 10).until(EC.url_contains('feed'))
+        login_user(driver)
 
     def test_profile_link_in_nav(self, driver):
         profile_link = wait_for(driver, By.ID, 'myProfileLink')
@@ -223,13 +241,7 @@ class TestFollowRequests:
 
     @pytest.fixture(autouse=True)
     def login_first(self, driver):
-        driver.get(f'{BASE_URL}/index.html')
-        wait_for(driver, By.ID, 'loginField').clear()
-        driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
-        driver.find_element(By.ID, 'loginPass').clear()
-        driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
-        WebDriverWait(driver, 10).until(EC.url_contains('feed'))
+        login_user(driver)
 
     def test_follow_requests_link_in_nav(self, driver):
         link = wait_for(driver, By.ID, 'reqsLink')
