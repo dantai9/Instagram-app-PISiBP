@@ -42,7 +42,7 @@ jobs:
 
       - name: Run tests
         working-directory: post-service
-        run: pytest tests/ -v --cov=api --cov-report=term-missing --cov-fail-under=70
+        run: pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
 
   test-feed-service:
     name: Unit Tests — feed-service
@@ -61,7 +61,7 @@ jobs:
 
       - name: Run tests
         working-directory: feed-service
-        run: pytest tests/ -v --cov=api --cov-report=term-missing --cov-fail-under=70
+        run: pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
 
   test-frontend:
     name: Unit Tests — frontend
