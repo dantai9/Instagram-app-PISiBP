@@ -111,3 +111,137 @@ class TestLogin:
         WebDriverWait(driver, 5).until(EC.url_contains('index'))
         assert 'index' in driver.current_url
 
+# ── FEED ──────────────────────────────
+
+class TestFeed:
+
+    @pytest.fixture(autouse=True)
+    def login_first(self, driver):
+        driver.get(f'{BASE_URL}/index.html')
+        wait_for(driver, By.ID, 'loginField').clear()
+        driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
+        driver.find_element(By.ID, 'loginPass').clear()
+        driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
+        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+        WebDriverWait(driver, 10).until(EC.url_contains('feed'))
+
+    def test_feed_page_loads(self, driver):
+        assert 'feed' in driver.current_url
+        assert 'Gramo' in driver.page_source
+
+    def test_nav_wordmark_present(self, driver):
+        wordmark = wait_for(driver, By.CLASS_NAME, 'nav-wordmark')
+        assert wordmark.text == 'Gramo'
+
+    def test_search_bar_present(self, driver):
+        search = wait_for(driver, By.ID, 'navSearch')
+        assert search.is_displayed()
+
+    def test_search_functionality(self, driver):
+        search = wait_for(driver, By.ID, 'navSearch')
+        search.clear()
+        search.send_keys('test')
+        time.sleep(1)
+        results = driver.find_element(By.ID, 'searchResults')
+        assert results.is_displayed()
+
+    def test_new_post_button_present(self, driver):
+        fab = wait_for(driver, By.CLASS_NAME, 'fab')
+        assert fab.is_displayed()
+
+    def test_open_new_post_modal(self, driver):
+        fab = wait_clickable(driver, By.CLASS_NAME, 'fab')
+        fab.click()
+        modal = wait_for(driver, By.ID, 'newPostModal')
+        assert 'open' in modal.get_attribute('class')
+
+    def test_close_new_post_modal(self, driver):
+        fab = wait_clickable(driver, By.CLASS_NAME, 'fab')
+        fab.click()
+        wait_for(driver, By.CLASS_NAME, 'modal-close').click()
+        time.sleep(0.5)
+        modal = driver.find_element(By.ID, 'newPostModal')
+        assert 'open' not in modal.get_attribute('class')
+
+    def test_logout_button(self, driver):
+        logout_btn = wait_clickable(driver, By.XPATH, "//button[contains(text(),'Sign out')]")
+        logout_btn.click()
+        WebDriverWait(driver, 5).until(EC.url_contains('index'))
+        assert 'index' in driver.current_url
+
+# ── PROFILE ──────────────────────────────
+
+class TestProfile:
+
+    @pytest.fixture(autouse=True)
+    def login_first(self, driver):
+        driver.get(f'{BASE_URL}/index.html')
+        wait_for(driver, By.ID, 'loginField').clear()
+        driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
+        driver.find_element(By.ID, 'loginPass').clear()
+        driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
+        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+        WebDriverWait(driver, 10).until(EC.url_contains('feed'))
+
+    def test_profile_link_in_nav(self, driver):
+        profile_link = wait_for(driver, By.ID, 'myProfileLink')
+        assert profile_link.is_displayed()
+
+    def test_navigate_to_own_profile(self, driver):
+        profile_link = wait_clickable(driver, By.ID, 'myProfileLink')
+        profile_link.click()
+        WebDriverWait(driver, 10).until(EC.url_contains('profile'))
+        assert 'profile' in driver.current_url
+
+    def test_profile_page_shows_name(self, driver):
+        profile_link = wait_clickable(driver, By.ID, 'myProfileLink')
+        profile_link.click()
+        WebDriverWait(driver, 10).until(EC.url_contains('profile'))
+        wait_for(driver, By.CLASS_NAME, 'profile-name')
+        assert TEST_NAME in driver.page_source
+
+    def test_edit_profile_button_visible_on_own_profile(self, driver):
+        profile_link = wait_clickable(driver, By.ID, 'myProfileLink')
+        profile_link.click()
+        WebDriverWait(driver, 10).until(EC.url_contains('profile'))
+        time.sleep(1)
+        assert 'Edit Profile' in driver.page_source
+
+    def test_open_edit_profile_form(self, driver):
+        profile_link = wait_clickable(driver, By.ID, 'myProfileLink')
+        profile_link.click()
+        WebDriverWait(driver, 10).until(EC.url_contains('profile'))
+        time.sleep(1)
+        edit_btn = wait_clickable(driver, By.XPATH, "//button[contains(text(),'Edit Profile')]")
+        edit_btn.click()
+        edit_form = wait_for(driver, By.ID, 'editForm')
+        assert 'open' in edit_form.get_attribute('class')
+
+# ── FOLLOW REQUESTS ──────────────────────────────
+
+class TestFollowRequests:
+
+    @pytest.fixture(autouse=True)
+    def login_first(self, driver):
+        driver.get(f'{BASE_URL}/index.html')
+        wait_for(driver, By.ID, 'loginField').clear()
+        driver.find_element(By.ID, 'loginField').send_keys(TEST_USER)
+        driver.find_element(By.ID, 'loginPass').clear()
+        driver.find_element(By.ID, 'loginPass').send_keys(TEST_PASS)
+        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+        WebDriverWait(driver, 10).until(EC.url_contains('feed'))
+
+    def test_follow_requests_link_in_nav(self, driver):
+        link = wait_for(driver, By.ID, 'reqsLink')
+        assert link.is_displayed()
+
+    def test_navigate_to_follow_requests(self, driver):
+        link = wait_clickable(driver, By.ID, 'reqsLink')
+        link.click()
+        WebDriverWait(driver, 10).until(EC.url_contains('follow-requests'))
+        assert 'follow-requests' in driver.current_url
+
+    def test_follow_requests_page_loads(self, driver):
+        driver.get(f'{BASE_URL}/follow-requests.html')
+        wait_for(driver, By.CLASS_NAME, 'page-title')
+        assert 'Follow Requests' in driver.page_source
