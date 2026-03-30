@@ -9,7 +9,7 @@ Projektni zadatak iz Projektovanja informacionih sistema i baza podataka.
 | Dušan Veljković | Frontend inženjer |
 | Kosta Petrović | Backend inženjer A |
 | Danilo Milivojević | Backend inženjer B |
-| Filip Bogdanović| Backend inženjer C |
+| Filip Bogdanović | Backend inženjer C |
 
 ---
 
@@ -65,11 +65,11 @@ Kada korisnik blokira nekog, automatski se ukidaju međusobna praćenja. Lajkovi
 
 1. Klonirajte repozitorijum:
 ```bash
-git clone https://github.com/username/instagram-clone.git
-cd instagram-clone
+git clone https://github.com/dantai9/Instagram-app-PISiBP.git
+cd Instagram-app-PISiBP
 ```
 
-2. Kreirajte `.env` fajl:
+2. Kreirajte `.env` fajl (opcionalno — aplikacija koristi podrazumevani ključ ako `.env` ne postoji):
 ```bash
 echo "SECRET_KEY=vas_tajni_kljuc" > .env
 ```
@@ -79,7 +79,7 @@ echo "SECRET_KEY=vas_tajni_kljuc" > .env
 docker compose up --build
 ```
 
-4. Otvorite pretraživač na `http://localhost`
+4. Otvorite pretraživač na `http://localhost:8080`
 
 ### Zaustavljanje
 
@@ -94,8 +94,8 @@ docker compose down
 **Unit testovi:**
 ```bash
 cd user-service && pytest tests/ -v --cov=app
-cd post-service && pytest tests/ -v --cov=api
-cd feed-service && pytest tests/ -v --cov=api
+cd post-service && pytest tests/ -v --cov=app
+cd feed-service && pytest tests/ -v --cov=app
 cd frontend && npm install && npm test
 ```
 
@@ -118,8 +118,14 @@ pytest ui/test_ui.py -v
 - Svaki **Pull Request** automatski pokreće unit testove za sve servise
 - Svaki **commit na main granu** pokreće testove i gradi Docker slike koje se objavljuju na Docker Hub sa oznakom u formatu `yyyymmdd-hhmmss`
 
-Docker slike su dostupne na: `https://hub.docker.com/u/username`
-
 ---
 
+## Moguća poboljšanja
 
+- Prelazak sa SQLite na PostgreSQL za bolje performanse i konkurentni pristup podacima
+- Implementacija real-time notifikacija putem WebSocket-a (npr. za nove zahteve za praćenje, lajkove i komentare)
+- Dodavanje Stories i Reels funkcionalnosti
+- Uvođenje centralizovane autentifikacije putem API Gateway-a umesto deljenja tajnog ključa između servisa
+- Implementacija keširanje sa Redis-om za brži feed
+- Dodavanje tagova, lokacija i audio zapisa uz objave
+- Implementacija paginacije za listu pratilaca i praćenih profila
