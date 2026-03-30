@@ -120,4 +120,12 @@ pytest ui/test_ui.py -v
 
 ---
 
+## Moguća poboljšanja
 
+- Prelazak sa SQLite na PostgreSQL za bolje performanse i konkurentni pristup podacima
+- Implementacija real-time notifikacija putem WebSocket-a (npr. za nove zahteve za praćenje, lajkove i komentare)
+- Dodavanje Stories i Reels funkcionalnosti
+- Uvođenje centralizovane autentifikacije putem API Gateway-a umesto deljenja tajnog ključa između servisa
+- Implementacija keširanje sa Redis-om za brži feed
+- Dodavanje tagova, lokacija i audio zapisa uz objave
+- Implementacija paginacije za listu pratilaca i praćenih profila
