@@ -129,3 +129,4 @@ pytest ui/test_ui.py -v
 - Implementacija keširanje sa Redis-om za brži feed
 - Dodavanje tagova, lokacija i audio zapisa uz objave
 - Implementacija paginacije za listu pratilaca i praćenih profila
+promena
